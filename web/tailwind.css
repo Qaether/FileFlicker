@@ -1,0 +1,30 @@
+@import "tailwindcss" source(none);
+@source "./index.html";
+@source "./app.ts";
+
+@layer base {
+  body { @apply min-h-screen bg-slate-950 text-slate-100 antialiased; }
+  button, label[for="pick"] { @apply cursor-pointer; }
+  :focus-visible { @apply outline-2 outline-offset-4 outline-teal-300; }
+}
+
+@layer components {
+  main { @apply mx-auto max-w-4xl px-5 pb-16; }
+  header { @apply mb-10 flex items-center justify-between border-b border-slate-800 py-6; }
+  h1 { @apply text-xl font-extrabold tracking-tight; }
+  h2 { @apply text-2xl font-bold tracking-tight; }
+  #login { @apply mx-auto mt-16 max-w-md rounded-3xl border border-slate-800 bg-slate-900 p-6 shadow-2xl sm:p-9; }
+  #login label { @apply mt-5 block text-sm font-medium text-slate-300; }
+  #login input, #search { @apply mt-2 block w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 text-slate-100 placeholder:text-slate-400; }
+  #login button, label[for="pick"] { @apply rounded-xl bg-teal-300 px-5 py-3 text-sm font-bold text-slate-950 hover:bg-teal-200; }
+  #login button { @apply mt-6 w-full disabled:cursor-wait disabled:opacity-60; }
+  label[for="pick"] { @apply inline-block; }
+  #pick:focus-visible + label { @apply outline-2 outline-offset-4 outline-teal-300; }
+  #logout, #files button { @apply shrink-0 rounded-lg border border-slate-700 px-3 py-2 text-sm text-teal-200 hover:bg-slate-800; }
+  #drop { @apply rounded-3xl border border-dashed border-teal-500/60 bg-slate-900 px-5 py-10 text-center transition-colors; }
+  #drop.active { @apply border-teal-200 bg-teal-950; }
+  #limits { @apply mt-4 text-sm text-slate-400; }
+  #uploads li, #files li { @apply my-2 rounded-xl border border-slate-800 bg-slate-900 px-4 py-3 text-sm break-all; }
+  #files li { @apply flex items-center justify-between gap-3; }
+  #status { @apply mx-auto mt-4 max-w-md text-sm text-amber-200; }
+}

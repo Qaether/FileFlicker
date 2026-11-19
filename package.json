@@ -1,0 +1,17 @@
+{
+  "devDependencies": {
+    "@tailwindcss/cli": "4.1.18",
+    "tailwindcss": "4.1.18",
+    "typescript": "5.9.3",
+    "vite": "7.3.8"
+  },
+  "scripts": {
+    "build:css": "tailwindcss -i web/tailwind.css -o web/style.css --minify",
+    "dev": "npm run build:css && vite web --host localhost --port 5173 --strictPort",
+    "build": "tsc --noEmit && npm run build:css && vite build web --outDir ../dist --emptyOutDir"
+  },
+  "overrides": {
+    "rollup": "npm:@rollup/wasm-node@4.59.0",
+    "esbuild": "0.28.1"
+  }
+}

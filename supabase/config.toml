@@ -1,0 +1,5 @@
+project_id = "FileFlicker"
+
+[functions.files]
+verify_jwt = true
+entrypoint = "./functions/files/index.ts"
