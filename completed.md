@@ -1,5 +1,9 @@
 # FileFlicker 완료 기록
 
+- 저장된 파일 목록을 업로드 영역 위로 옮기고, 목록 새로고침과 빈 상태 안내를 추가했다. 운영 계정으로 파일 목록 API에서 파일 1개가 조회되는 것을 확인했고 웹 빌드를 통과했다.
+
+- 로컬 환경 파일에 지정한 서비스 계정을 Supabase Auth에 설정했고, 해당 정보로 세션 발급을 확인했다.
+
 - 기존 Flask 앱과 Python·Docker 실행 파일, Live Server 설정을 제거했다. 정리 후 TypeScript·Tailwind·Vite 프로덕션 빌드를 통과했다.
 
 - 웹 클라이언트를 TypeScript와 Vite로 전환했다. 타입 검사와 프로덕션 빌드를 통과했고 로컬 Vite 서버에서 HTML과 변환된 모듈이 HTTP 200을 반환했다. Actions 운영 배포는 실행하지 않았다.

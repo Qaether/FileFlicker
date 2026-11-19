@@ -70,6 +70,9 @@ function renderFiles() {
     row.append(button);
     list.append(row);
   }
+  element("files-state").textContent = list.childElementCount
+    ? `${list.childElementCount}개 파일`
+    : query ? "검색 조건에 맞는 파일이 없습니다." : "저장된 파일이 없습니다.";
 }
 
 async function refresh(token: string) {
@@ -78,6 +81,16 @@ async function refresh(token: string) {
   records = rows;
   renderFiles();
 }
+
+element("refresh-files").addEventListener("click", async () => {
+  if (!session) return;
+  status.textContent = "";
+  try {
+    await refresh(session);
+  } catch (error) {
+    status.textContent = errorMessage(error);
+  }
+});
 
 login.addEventListener("submit", async (event) => {
   event.preventDefault();
