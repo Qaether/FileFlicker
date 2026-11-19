@@ -3,3 +3,8 @@ project_id = "FileFlicker"
 [functions.files]
 verify_jwt = true
 entrypoint = "./functions/files/index.ts"
+
+[functions.mcp]
+# OAuth discovery must be public; withSupabase verifies every protected request.
+verify_jwt = false
+entrypoint = "./functions/mcp/index.ts"

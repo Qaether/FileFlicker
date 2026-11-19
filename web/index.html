@@ -20,6 +20,19 @@
     <label>비밀번호 <input name="password" type="password" placeholder="비밀번호 입력" autocomplete="current-password" required></label>
     <button class="primary-button">로그인</button>
   </form>
+  <section id="oauth-consent" class="page" hidden>
+    <div class="panel p-6 sm:p-10">
+      <h2>FileFlicker 연결</h2>
+      <p class="intro">다음 앱이 내 파일의 읽기 권한을 요청합니다. 파일 검색, 내용 조회 및 다운로드가 가능해집니다.</p>
+      <p id="oauth-client" class="mt-5 font-semibold"></p>
+      <p id="oauth-redirect" class="metadata"></p>
+      <p id="oauth-scope" class="metadata"></p>
+      <div class="mt-6 flex gap-3">
+        <button id="oauth-approve" type="button" class="primary-button">연결 허용</button>
+        <button id="oauth-deny" type="button" class="secondary-button">거부</button>
+      </div>
+    </div>
+  </section>
   <section id="library" hidden>
     <section aria-labelledby="files-heading" class="page">
       <div class="page-heading">

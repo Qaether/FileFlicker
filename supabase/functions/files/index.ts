@@ -47,6 +47,18 @@ Deno.serve(async (request) => {
     if (!user) return reply({ error: "Sign in required" }, 401);
     const input = await request.json().catch(() => null);
     if (!input || typeof input !== "object") return reply({ error: "Invalid request" }, 400);
+    // getFileOwner has already validated this token with Supabase Auth.
+    const token = request.headers.get("authorization")?.slice(7) || "";
+    let claims: { client_id?: unknown };
+    try {
+      const payload = token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/");
+      claims = JSON.parse(atob(payload));
+    } catch {
+      return reply({ error: "Invalid session" }, 401);
+    }
+    if (claims.client_id && input.action !== "download") {
+      return reply({ error: "OAuth 연결은 파일 읽기만 허용됩니다." }, 403);
+    }
     const owned = new URLSearchParams({ owner_id: `eq.${user.id}`, deleted_at: "is.null" });
     if (input.action === "reserve") {
       const { name, sha256, size, contentType } = input;

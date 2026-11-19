@@ -50,6 +50,35 @@ const dialog = element<HTMLDialogElement>("file-dialog");
 const fileForm = element<HTMLFormElement>("file-form");
 const filesPage = element("files-heading").closest("section")!;
 const uploadPage = element("upload-page");
+const authorizationId = location.pathname === "/oauth/consent" ? new URLSearchParams(location.search).get("authorization_id") : null;
+
+async function showConsent() {
+  if (!authorizationId) return;
+  const { data, error } = await auth.auth.oauth.getAuthorizationDetails(authorizationId);
+  if (error || !data) throw error || new Error("연결 요청을 확인할 수 없습니다.");
+  if (!("authorization_id" in data)) {
+    location.assign(data.redirect_url);
+    return;
+  }
+  element("library").hidden = true;
+  element("oauth-consent").hidden = false;
+  element("oauth-client").textContent = data.client.name || "이름 없는 앱";
+  element("oauth-redirect").textContent = `돌아갈 주소: ${data.redirect_uri}`;
+  element("oauth-scope").textContent = `요청 권한: ${data.scope || "기본 접근"}`;
+}
+
+async function decideConsent(approve: boolean) {
+  if (!authorizationId) return;
+  try {
+    const result = approve
+      ? await auth.auth.oauth.approveAuthorization(authorizationId)
+      : await auth.auth.oauth.denyAuthorization(authorizationId);
+    if (result.error) throw result.error;
+    if (result.data?.redirect_url) location.assign(result.data.redirect_url);
+  } catch (error) { status.textContent = errorMessage(error); }
+}
+element("oauth-approve").addEventListener("click", () => void decideConsent(true));
+element("oauth-deny").addEventListener("click", () => void decideConsent(false));
 
 async function api<T>(path: string, { body, token }: { body?: object; token?: string } = {}): Promise<T> {
   const headers = new Headers({ apikey: key });
@@ -363,7 +392,8 @@ login.addEventListener("submit", async (event) => {
     login.hidden = true;
     logout.hidden = false;
     element("library").hidden = false;
-    await refresh(session);
+    if (authorizationId) await showConsent();
+    else await refresh(session);
   } catch (error) {
     status.textContent = errorMessage(error);
   } finally {
@@ -383,6 +413,7 @@ function showSignedOut() {
   renderFiles();
   element("uploads").replaceChildren();
   element("library").hidden = true;
+  element("oauth-consent").hidden = true;
   logout.hidden = true;
   login.hidden = false;
   status.textContent = "";
@@ -414,7 +445,7 @@ async function restoreSession() {
   login.hidden = true;
   logout.hidden = false;
   element("library").hidden = false;
-  try { await refresh(session); }
+  try { if (authorizationId) await showConsent(); else await refresh(session); }
   catch (error) { status.textContent = errorMessage(error); }
 }
 void restoreSession();
