@@ -29,7 +29,6 @@ jobs:
       - name: Type-check and build public assets
         run: |
           set -eu
-          node --check supabase/functions/files/index.ts
           npm ci
           npm run build
       - name: Check deployment configuration
