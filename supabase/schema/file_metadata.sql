@@ -4,6 +4,7 @@ create table public.files (
   id uuid primary key default gen_random_uuid(),
   owner_id uuid not null references auth.users(id) on delete cascade,
   original_name text not null check (length(original_name) between 1 and 1024),
+  title text check (title is null or length(title) between 1 and 1024),
   sha256 text not null check (sha256 ~ '^[0-9a-f]{64}$'),
   size_bytes bigint not null check (size_bytes >= 0),
   content_type text,

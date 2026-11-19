@@ -16,12 +16,15 @@
     <section aria-labelledby="files-heading" class="mb-8">
       <header class="!mb-4 !border-0 !p-0">
         <h2 id="files-heading">저장된 파일</h2>
-        <button id="refresh-files" type="button" class="rounded-lg border border-slate-700 px-3 py-2 text-sm text-teal-200">새로고침</button>
+        <div class="flex gap-2"><button id="show-trash" type="button">휴지통</button><button id="show-upload" type="button" class="rounded-lg bg-teal-300 px-4 py-2 text-sm font-bold text-slate-950">업로드</button></div>
       </header>
+      <button id="refresh-files" type="button" class="text-sm text-teal-200">새로고침</button>
       <input id="search" type="search" aria-label="파일 검색" placeholder="파일명, 요약, 태그 검색">
       <p id="files-state" class="mt-3 text-sm text-slate-400" role="status"></p>
       <ul id="files"></ul>
     </section>
+    <section id="upload-page" hidden>
+    <button id="back-to-files" type="button" class="mb-5 text-teal-200">← 파일 목록으로</button>
     <div id="drop">
       <p class="mb-5 text-xl font-semibold">파일을 여기에 놓으세요</p>
       <input id="pick" class="sr-only" type="file" multiple aria-describedby="limits">
@@ -29,7 +32,27 @@
       <p id="limits">파일당 50 MB 미만 · 동영상 제외</p>
     </div>
     <ul id="uploads" aria-live="polite"></ul>
+    </section>
   </section>
+  <dialog id="file-dialog" class="m-auto w-[min(92vw,36rem)] rounded-2xl border border-slate-700 bg-slate-900 p-6 text-slate-100 backdrop:bg-black/70">
+    <form id="file-form">
+      <div class="flex justify-between"><h2>파일 상세</h2><button id="close-dialog" type="button" aria-label="닫기">✕</button></div>
+      <label class="mt-4 block">제목<input name="title" required maxlength="1024" class="mt-1 block w-full rounded-lg border border-slate-700 bg-slate-950 p-2"></label>
+      <p id="original-name" class="mt-2 text-sm text-slate-400"></p>
+      <label class="mt-4 block">요약<textarea name="summary" maxlength="20000" rows="4" class="mt-1 block w-full rounded-lg border border-slate-700 bg-slate-950 p-2"></textarea></label>
+      <label class="mt-4 block">분류<input name="category" maxlength="200" class="mt-1 block w-full rounded-lg border border-slate-700 bg-slate-950 p-2"></label>
+      <label class="mt-4 block">태그 <span class="text-sm text-slate-400">쉼표로 구분</span><input name="tags" class="mt-1 block w-full rounded-lg border border-slate-700 bg-slate-950 p-2"></label>
+      <p id="file-info" class="mt-4 text-sm text-slate-400"></p>
+      <p id="dialog-status" role="status" class="mt-2 text-amber-200"></p>
+      <div class="mt-5 flex flex-wrap gap-3">
+        <button id="save-file" class="rounded-lg bg-teal-300 px-4 py-2 font-semibold text-slate-950">저장</button>
+        <button id="download-file" type="button">다운로드</button>
+        <button id="trash-file" type="button" class="text-rose-300">휴지통으로 이동</button>
+        <button id="restore-file" type="button" hidden>복구</button>
+        <button id="purge-file" type="button" hidden class="text-rose-300">영구 삭제</button>
+      </div>
+    </form>
+  </dialog>
   <p id="status" role="status"></p>
 </main>
 <script type="module" src="./app.ts"></script>

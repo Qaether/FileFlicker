@@ -1,4 +1,4 @@
-import { CopyObjectCommand, GetObjectCommand, PutObjectCommand, S3Client } from "npm:@aws-sdk/client-s3@3.922.0";
+import { CopyObjectCommand, DeleteObjectCommand, GetObjectCommand, PutObjectCommand, S3Client } from "npm:@aws-sdk/client-s3@3.922.0";
 import { getSignedUrl } from "npm:@aws-sdk/s3-request-presigner@3.922.0";
 import { createHash } from "node:crypto";
 import { getFileOwner } from "../_shared/auth.ts";
@@ -81,10 +81,37 @@ Deno.serve(async (request) => {
     if (typeof input.id !== "string" || !/^[a-f0-9-]{36}$/i.test(input.id)) {
       return reply({ error: "Invalid file ID" }, 400);
     }
+    if (input.action === "restore" || input.action === "purge") owned.set("deleted_at", "not.is.null");
     owned.set("id", `eq.${input.id}`);
     const [file] = await files(owned);
     if (!file) return reply({ error: "File not found" }, 404);
     const object = { Bucket: bucket, Key: file.object_key };
+    if (input.action === "update" && file.upload_status === "uploaded") {
+      const { title, summary, category, tags } = input;
+      if (typeof title !== "string" || !title.trim() || title.length > 1024 ||
+          typeof summary !== "string" || summary.length > 20000 ||
+          typeof category !== "string" || category.length > 200 ||
+          !Array.isArray(tags) || tags.length > 50 ||
+          !tags.every((tag: unknown) => typeof tag === "string" && tag.length > 0 && tag.length <= 100)) {
+        return reply({ error: "입력 내용을 확인해 주세요." }, 400);
+      }
+      await files(owned, "PATCH", { title: title.trim(), summary, category, tags, updated_at: new Date().toISOString() }, "return=representation");
+      return reply({ id: file.id });
+    }
+    if (input.action === "trash" && file.upload_status === "uploaded") {
+      await files(owned, "PATCH", { deleted_at: new Date().toISOString() }, "return=representation");
+      return reply({ id: file.id });
+    }
+    if (input.action === "restore") {
+      await files(owned, "PATCH", { deleted_at: null }, "return=representation");
+      return reply({ id: file.id });
+    }
+    if (input.action === "purge") {
+      await storage.send(new DeleteObjectCommand(object));
+      await storage.send(new DeleteObjectCommand({ Bucket: bucket, Key: `pending/${file.object_key}` }));
+      await files(owned, "DELETE", undefined, "return=representation");
+      return reply({ id: file.id });
+    }
     if (input.action === "complete") {
       if (file.upload_status === "uploaded") return reply({ id: file.id });
       if (file.size_bytes >= uploadLimitBytes) return reply({ error: "업로드 한도인 50 MB를 초과했습니다." }, 413);
