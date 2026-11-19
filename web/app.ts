@@ -15,7 +15,7 @@ interface FileRecord {
 type FileOperation =
   | { action: "reserve"; name: string; size: number; contentType: string; sha256: string }
   | { action: "complete" | "download" | "trash" | "restore" | "purge"; id: string }
-  | { action: "generate"; id: string; kind: "summary" | "tags" }
+  | { action: "generate"; id: string; kind: "summary" | "tags"; text: string }
   | { action: "update"; id: string; title: string; summary: string; tags: string[] };
 type Reservation = { id: string; duplicate: true } | { id: string; duplicate?: false; url: string };
 const errorMessage = (error: unknown) => error instanceof Error ? error.message : "요청에 실패했습니다.";
@@ -174,11 +174,16 @@ async function generate(kind: "summary" | "tags") {
   const target = selected.id;
   const button = element<HTMLButtonElement>(`generate-${kind}`);
   button.disabled = true;
-  button.textContent = "…";
-  element("dialog-status").textContent = "AI 생성 중입니다.";
+  button.classList.add("loading");
+  button.setAttribute("aria-busy", "true");
+  element("dialog-status").textContent = "";
   element("ai-preview").hidden = true;
   try {
-    const result = await fileAction<{ summary?: string; tags?: string[] }>(session, { action: "generate", id: target, kind });
+    const download = await fileAction<{ url: string }>(session, { action: "download", id: target });
+    const { extractBeginning } = await import("./extract-text");
+    const text = await extractBeginning(download.url, selected.original_name);
+    if (!dialog.open || selected?.id !== target || !session) return;
+    const result = await fileAction<{ summary?: string; tags?: string[] }>(session, { action: "generate", id: target, kind, text });
     if (!dialog.open || selected?.id !== target) return;
     if (kind === "summary" && typeof result.summary === "string") aiResult = { kind, value: result.summary };
     else if (kind === "tags" && Array.isArray(result.tags)) aiResult = { kind, value: result.tags };
@@ -189,7 +194,7 @@ async function generate(kind: "summary" | "tags") {
     element("dialog-status").textContent = "결과를 확인하고 적용하세요.";
   } catch (error) {
     if (dialog.open && selected?.id === target) element("dialog-status").textContent = errorMessage(error);
-  } finally { button.disabled = false; button.textContent = "✦"; }
+  } finally { button.disabled = false; button.classList.remove("loading"); button.removeAttribute("aria-busy"); }
 }
 element("generate-summary").addEventListener("click", () => void generate("summary"));
 element("generate-tags").addEventListener("click", () => void generate("tags"));

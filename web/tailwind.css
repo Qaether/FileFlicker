@@ -41,6 +41,8 @@
   .files-state { @apply px-5 py-3 text-sm text-gray-500; }
   .pagination { @apply flex items-center justify-end gap-4 border-t border-gray-200 p-4 text-sm text-gray-600; }
   .icon-button { @apply inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-gray-200 bg-white text-xl text-gray-600 hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-40; }
+  .icon-button.loading { position: relative; color: transparent; }
+  .icon-button.loading::after { content: ""; position: absolute; width: 1.2rem; height: 1.2rem; border: 2px solid #bfdbfe; border-top-color: #1d4ed8; border-radius: 50%; animation: ai-spin .7s linear infinite; }
   #drop { @apply rounded-xl border-2 border-dashed border-blue-200 bg-white px-5 py-14 text-center; }
   #drop.active { @apply border-blue-600 bg-blue-50; }
   .upload-icon { @apply mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-blue-50 text-3xl text-blue-700; }
@@ -62,3 +64,4 @@
   .danger-icon { @apply text-red-600; }
   .message { @apply mt-4 text-sm text-red-700; }
 }
+@keyframes ai-spin { to { transform: rotate(360deg); } }
