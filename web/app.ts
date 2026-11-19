@@ -320,7 +320,12 @@ function applyAi(append: boolean) {
 element("ai-apply").addEventListener("click", () => applyAi(false));
 element("ai-add").addEventListener("click", () => applyAi(true));
 element("show-upload").addEventListener("click", () => { filesPage.hidden = true; uploadPage.hidden = false; });
-element("back-to-files").addEventListener("click", () => { uploadPage.hidden = true; filesPage.hidden = false; });
+element("back-to-files").addEventListener("click", () => {
+  uploadPage.hidden = true;
+  element("uploads").replaceChildren();
+  picker.value = "";
+  filesPage.hidden = false;
+});
 element("show-trash").addEventListener("click", async () => {
   if (!session) return;
   trashView = !trashView;
