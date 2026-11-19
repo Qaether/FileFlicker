@@ -80,10 +80,17 @@ function renderFiles() {
     const row = document.createElement("li");
     const button = document.createElement("button");
     button.textContent = file.title || file.original_name;
-    button.className = "min-w-0 w-full truncate text-left";
     button.title = file.title || file.original_name;
     button.addEventListener("click", () => openFile(file));
-    row.append(button);
+    const date = document.createElement("span");
+    date.className = "file-meta";
+    date.textContent = new Date(file.created_at).toLocaleDateString("ko-KR");
+    const size = document.createElement("span");
+    size.className = "file-meta";
+    size.textContent = file.size_bytes < 1_000_000
+      ? `${(file.size_bytes / 1000).toFixed(1)} KB`
+      : `${(file.size_bytes / 1_000_000).toFixed(1)} MB`;
+    row.append(button, date, size);
     list.append(row);
   }
   element("files-state").textContent = filtered.length

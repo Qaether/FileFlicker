@@ -1,63 +1,76 @@
-<!doctype html>
+﻿<!doctype html>
 <html lang="ko">
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>FileFlicker</title>
-<link rel="stylesheet" href="./style.css">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>FileFlicker</title>
+  <link rel="stylesheet" href="./style.css">
+</head>
+<body>
 <main>
-  <header class="sticky top-0 z-10 bg-slate-950"><h1><span class="mr-2 text-teal-300" aria-hidden="true">▰</span>FileFlicker</h1><button id="logout" type="button" hidden>로그아웃</button></header>
+  <header class="app-header">
+    <h1><span class="brand-mark" aria-hidden="true">F</span>FileFlicker</h1>
+    <button id="logout" type="button" class="secondary-button" hidden>로그아웃</button>
+  </header>
   <form id="login">
-    <h2>내 파일 보관함</h2>
-    <label>이메일 <input name="email" type="email" autocomplete="username" required></label>
-    <label>비밀번호 <input name="password" type="password" autocomplete="current-password" required></label>
-    <button>로그인</button>
+    <span class="login-mark" aria-hidden="true">F</span>
+    <h2>다시 오신 것을 환영합니다</h2>
+    <p class="intro">로그인하고 파일 보관함을 열어보세요.</p>
+    <label>이메일 <input name="email" type="email" placeholder="name@example.com" autocomplete="username" required></label>
+    <label>비밀번호 <input name="password" type="password" placeholder="비밀번호 입력" autocomplete="current-password" required></label>
+    <button class="primary-button">로그인</button>
   </form>
   <section id="library" hidden>
-    <section aria-labelledby="files-heading" class="mb-8">
-      <header class="!mb-4 !border-0 !p-0">
-        <h2 id="files-heading">저장된 파일</h2>
-        <div class="flex gap-2"><button id="show-trash" type="button">휴지통</button><button id="show-upload" type="button" class="rounded-lg bg-teal-300 px-4 py-2 text-sm font-bold text-slate-950">업로드</button></div>
-      </header>
-      <button id="refresh-files" type="button" class="text-sm text-teal-200">새로고침</button>
-      <input id="search" type="search" aria-label="파일 검색" placeholder="파일명, 요약, 태그 검색">
-      <p id="files-state" class="mt-3 text-sm text-slate-400" role="status"></p>
-      <ul id="files"></ul>
-      <nav aria-label="파일 목록 페이지" class="mt-5 flex items-center justify-center gap-4">
-        <button id="previous-page" type="button" class="icon-button" aria-label="이전 페이지" title="이전 페이지">‹</button>
-        <span id="page-state" aria-live="polite"></span>
-        <button id="next-page" type="button" class="icon-button" aria-label="다음 페이지" title="다음 페이지">›</button>
-      </nav>
+    <section aria-labelledby="files-heading" class="page">
+      <div class="page-heading">
+        <div><p class="eyebrow">MY LIBRARY</p><h2 id="files-heading">저장된 파일</h2><p class="intro">파일을 검색하고 관리하세요.</p></div>
+        <div class="heading-actions"><button id="show-trash" type="button" class="secondary-button">휴지통</button><button id="show-upload" type="button" class="primary-button">＋ 파일 업로드</button></div>
+      </div>
+      <div class="panel">
+        <div class="list-toolbar"><label class="search-label"><span class="sr-only">파일 검색</span><input id="search" type="search" placeholder="파일명, 요약, 태그 검색"></label><button id="refresh-files" type="button" class="secondary-button">새로고침</button></div>
+        <div class="list-heading"><span>파일 이름</span><span>등록일</span><span>크기</span></div>
+        <p id="files-state" class="files-state" role="status"></p>
+        <ul id="files"></ul>
+        <nav aria-label="파일 목록 페이지" class="pagination">
+          <button id="previous-page" type="button" class="icon-button" aria-label="이전 페이지" title="이전 페이지">‹</button>
+          <span id="page-state" aria-live="polite"></span>
+          <button id="next-page" type="button" class="icon-button" aria-label="다음 페이지" title="다음 페이지">›</button>
+        </nav>
+      </div>
     </section>
-    <section id="upload-page" hidden>
-    <button id="back-to-files" type="button" class="mb-5 text-teal-200">← 파일 목록으로</button>
-    <div id="drop">
-      <p class="mb-5 text-xl font-semibold">파일을 여기에 놓으세요</p>
-      <input id="pick" class="sr-only" type="file" multiple aria-describedby="limits">
-      <label for="pick">파일 선택</label>
-      <p id="limits">파일당 50 MB 미만 · 동영상 제외</p>
-    </div>
-    <ul id="uploads" aria-live="polite"></ul>
+    <section id="upload-page" class="page" hidden>
+      <button id="back-to-files" type="button" class="back-button">‹ 파일 목록으로</button>
+      <div class="page-heading"><div><p class="eyebrow">UPLOAD</p><h2>파일 업로드</h2><p class="intro">보관할 파일을 선택해 주세요.</p></div></div>
+      <div id="drop">
+        <div class="upload-icon" aria-hidden="true">↑</div>
+        <p class="drop-title">파일을 여기에 놓으세요</p>
+        <p class="intro">또는 파일을 직접 선택할 수 있습니다.</p>
+        <input id="pick" class="sr-only" type="file" multiple aria-describedby="limits">
+        <label for="pick" class="primary-button">파일 선택</label>
+        <p id="limits">파일당 50 MB 미만 · 동영상 제외</p>
+      </div>
+      <ul id="uploads" aria-live="polite"></ul>
     </section>
   </section>
-  <dialog id="file-dialog" class="m-auto max-h-[90vh] w-[min(94vw,60rem)] max-w-none overflow-y-auto rounded-2xl border border-slate-700 bg-slate-900 p-6 text-slate-100 backdrop:bg-black/70 sm:p-8">
+  <dialog id="file-dialog">
     <form id="file-form">
-      <div class="flex justify-between"><h2>파일 상세</h2><button id="close-dialog" type="button" aria-label="닫기">✕</button></div>
-      <div class="mt-4 flex items-end gap-3"><label class="min-w-0 flex-1">제목<input name="title" required maxlength="1024" class="mt-1 block w-full rounded-lg border border-slate-700 bg-slate-950 p-2"></label><button id="download-file" type="button" class="icon-button shrink-0" title="다운로드" aria-label="다운로드">↓</button></div>
-      <p id="original-name" class="mt-2 text-sm text-slate-400"></p>
-      <label class="mt-4 block">요약<textarea name="summary" maxlength="20000" rows="4" class="mt-1 block w-full rounded-lg border border-slate-700 bg-slate-950 p-2"></textarea></label>
-      <label class="mt-4 block">분류<input name="category" maxlength="200" class="mt-1 block w-full rounded-lg border border-slate-700 bg-slate-950 p-2"></label>
-      <label class="mt-4 block">태그 <span class="text-sm text-slate-400">쉼표로 구분</span><input name="tags" class="mt-1 block w-full rounded-lg border border-slate-700 bg-slate-950 p-2"></label>
-      <p id="file-info" class="mt-4 text-sm text-slate-400"></p>
-      <p id="dialog-status" role="status" class="mt-2 text-amber-200"></p>
-      <div class="mt-5 flex flex-wrap gap-3">
-        <button id="save-file" class="icon-button" title="저장" aria-label="저장">✓</button>
-        <button id="trash-file" type="button" class="icon-button text-rose-300" title="휴지통으로 이동" aria-label="휴지통으로 이동">🗑</button>
+      <div class="modal-heading"><div><p class="eyebrow">FILE DETAILS</p><h2>파일 상세</h2></div><button id="close-dialog" type="button" class="icon-button" aria-label="닫기" title="닫기">✕</button></div>
+      <div class="title-field"><label>제목<input name="title" required maxlength="1024"></label><button id="download-file" type="button" class="icon-button" title="다운로드" aria-label="다운로드">↓</button></div>
+      <p id="original-name" class="metadata"></p>
+      <label>요약<textarea name="summary" maxlength="20000" rows="5"></textarea></label>
+      <div class="field-grid"><label>분류<input name="category" maxlength="200"></label><label>태그 <span class="field-hint">쉼표로 구분</span><input name="tags"></label></div>
+      <p id="file-info" class="metadata"></p>
+      <p id="dialog-status" role="status" class="message"></p>
+      <div class="modal-actions">
+        <button id="save-file" class="icon-button primary-icon" title="저장" aria-label="저장">✓</button>
+        <button id="trash-file" type="button" class="icon-button danger-icon" title="휴지통으로 이동" aria-label="휴지통으로 이동">🗑</button>
         <button id="restore-file" type="button" hidden class="icon-button" title="복구" aria-label="복구">↶</button>
-        <button id="purge-file" type="button" hidden class="icon-button text-rose-300" title="영구 삭제" aria-label="영구 삭제">🗑</button>
+        <button id="purge-file" type="button" hidden class="icon-button danger-icon" title="영구 삭제" aria-label="영구 삭제">🗑</button>
       </div>
     </form>
   </dialog>
-  <p id="status" role="status"></p>
+  <p id="status" role="status" class="message"></p>
 </main>
 <script type="module" src="./app.ts"></script>
+</body>
 </html>
