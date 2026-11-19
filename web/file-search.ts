@@ -12,6 +12,6 @@ function normalize(value: string): string {
 export function matchesFile(file: SearchableFile, search: string): boolean {
   const terms = normalize(search).split(" ").filter(Boolean);
   if (!terms.length) return true;
-  const displayedName = normalize(file.title || file.original_name);
-  return terms.every(term => displayedName.includes(term));
+  const fields = [file.title || file.original_name, file.summary ?? "", ...(file.tags ?? [])].map(normalize);
+  return terms.every(term => fields.some(field => field.includes(term)));
 }
