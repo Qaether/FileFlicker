@@ -1,5 +1,5 @@
 import { exclusionReason } from "./upload-rules";
-import { matchesFile, matchesOriginalName } from "./file-search";
+import { matchesFile } from "./file-search";
 import { createClient } from "@supabase/supabase-js";
 
 interface FileRecord {
@@ -84,16 +84,6 @@ function renderFiles() {
     button.textContent = file.title || file.original_name;
     button.title = file.title || file.original_name;
     button.addEventListener("click", () => openFile(file));
-    if (matchesOriginalName(file, query)) {
-      const title = document.createElement("span");
-      title.className = "file-title";
-      title.textContent = file.title || file.original_name;
-      const original = document.createElement("span");
-      original.className = "file-original";
-      original.textContent = `원본 파일명에서 일치 · ${file.original_name}`;
-      button.replaceChildren(title, original);
-      button.title = `${file.title}\n원본 파일명: ${file.original_name}`;
-    }
     const date = document.createElement("span");
     date.className = "file-meta";
     date.textContent = new Date(file.created_at).toLocaleDateString("ko-KR");
