@@ -1,4 +1,5 @@
 import { exclusionReason } from "./upload-rules";
+import { matchesFile } from "./file-search";
 import { createClient } from "@supabase/supabase-js";
 
 interface FileRecord {
@@ -71,13 +72,10 @@ const fileAction = <T>(token: string, body: FileOperation) => api<T>("/functions
 });
 
 function renderFiles() {
-  const query = search.value.trim().toLocaleLowerCase();
+  const query = search.value.trim();
   const list = element("files");
   list.replaceChildren();
-  const filtered = records.filter((file) => {
-    const text = [file.title, file.original_name, file.summary, ...file.tags].join(" ");
-    return text.toLocaleLowerCase().includes(query);
-  });
+  const filtered = records.filter(file => matchesFile(file, query));
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
   page = Math.min(page, totalPages);
   for (const file of filtered.slice((page - 1) * pageSize, page * pageSize)) {
