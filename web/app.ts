@@ -8,7 +8,6 @@ interface FileRecord {
   size_bytes: number;
   created_at: string;
   deleted_at: string | null;
-  category: string | null;
   summary: string | null;
   tags: string[];
 }
@@ -16,7 +15,8 @@ interface FileRecord {
 type FileOperation =
   | { action: "reserve"; name: string; size: number; contentType: string; sha256: string }
   | { action: "complete" | "download" | "trash" | "restore" | "purge"; id: string }
-  | { action: "update"; id: string; title: string; summary: string; category: string; tags: string[] };
+  | { action: "generate"; id: string; kind: "summary" | "tags" }
+  | { action: "update"; id: string; title: string; summary: string; tags: string[] };
 type Reservation = { id: string; duplicate: true } | { id: string; duplicate?: false; url: string };
 const errorMessage = (error: unknown) => error instanceof Error ? error.message : "요청에 실패했습니다.";
 
@@ -71,7 +71,7 @@ function renderFiles() {
   const list = element("files");
   list.replaceChildren();
   const filtered = records.filter((file) => {
-    const text = [file.title, file.original_name, file.category, file.summary, ...file.tags].join(" ");
+    const text = [file.title, file.original_name, file.summary, ...file.tags].join(" ");
     return text.toLocaleLowerCase().includes(query);
   });
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
@@ -109,7 +109,7 @@ async function refresh(token: string) {
   const rows: FileRecord[] = [];
   const batchSize = 500;
   for (let offset = 0; ; offset += batchSize) {
-    const batch = await api<FileRecord[]>(`/rest/v1/files?select=id,original_name,title,size_bytes,created_at,deleted_at,summary,category,tags&upload_status=eq.uploaded&deleted_at=${deleted}&order=created_at.desc,id.desc&limit=${batchSize}&offset=${offset}`, { token });
+    const batch = await api<FileRecord[]>(`/rest/v1/files?select=id,original_name,title,size_bytes,created_at,deleted_at,summary,tags&upload_status=eq.uploaded&deleted_at=${deleted}&order=created_at.desc,id.desc&limit=${batchSize}&offset=${offset}`, { token });
     if (!session || trashView !== view) return;
     rows.push(...batch);
     if (batch.length < batchSize) break;
@@ -124,8 +124,9 @@ function openFile(file: FileRecord) {
   const set = (name: string, value: string) => { (fileForm.elements.namedItem(name) as HTMLInputElement).value = value; };
   set("title", file.title || file.original_name);
   set("summary", file.summary || "");
-  set("category", file.category || "");
   set("tags", file.tags.join(", "));
+  element("ai-preview").hidden = true;
+  for (const id of ["generate-summary", "generate-tags"]) element(id).hidden = trashView;
   element("original-name").textContent = `원본 파일명: ${file.original_name}`;
   element("file-info").textContent = `${file.size_bytes.toLocaleString()}바이트 · ${new Date(file.created_at).toLocaleDateString("ko-KR")}`;
   element("dialog-status").textContent = "";
@@ -161,11 +162,51 @@ fileForm.addEventListener("submit", async (event) => {
   const tags = String(data.get("tags") || "").split(",").map(tag => tag.trim()).filter(Boolean);
   try {
     await fileAction(session, { action: "update", id: selected.id, title: String(data.get("title") || ""),
-      summary: String(data.get("summary") || ""), category: String(data.get("category") || ""), tags });
+      summary: String(data.get("summary") || ""), tags });
     dialog.close();
     await refresh(session);
   } catch (error) { element("dialog-status").textContent = errorMessage(error); }
 });
+
+let aiResult: { kind: "summary"; value: string } | { kind: "tags"; value: string[] } | undefined;
+async function generate(kind: "summary" | "tags") {
+  if (!session || !selected) return;
+  const target = selected.id;
+  const button = element<HTMLButtonElement>(`generate-${kind}`);
+  button.disabled = true;
+  button.textContent = "…";
+  element("dialog-status").textContent = "AI 생성 중입니다.";
+  element("ai-preview").hidden = true;
+  try {
+    const result = await fileAction<{ summary?: string; tags?: string[] }>(session, { action: "generate", id: target, kind });
+    if (!dialog.open || selected?.id !== target) return;
+    if (kind === "summary" && typeof result.summary === "string") aiResult = { kind, value: result.summary };
+    else if (kind === "tags" && Array.isArray(result.tags)) aiResult = { kind, value: result.tags };
+    else throw new Error("AI 결과를 읽지 못했습니다.");
+    element("ai-result").textContent = typeof aiResult.value === "string" ? aiResult.value : aiResult.value.join(", ");
+    element("ai-add").hidden = kind !== "tags";
+    element("ai-preview").hidden = false;
+    element("dialog-status").textContent = "결과를 확인하고 적용하세요.";
+  } catch (error) {
+    if (dialog.open && selected?.id === target) element("dialog-status").textContent = errorMessage(error);
+  } finally { button.disabled = false; button.textContent = "✦"; }
+}
+element("generate-summary").addEventListener("click", () => void generate("summary"));
+element("generate-tags").addEventListener("click", () => void generate("tags"));
+element("ai-dismiss").addEventListener("click", () => { element("ai-preview").hidden = true; });
+function applyAi(append: boolean) {
+  if (!aiResult) return;
+  const field = element<HTMLInputElement | HTMLTextAreaElement>(aiResult.kind);
+  if (aiResult.kind === "summary") field.value = aiResult.value;
+  else {
+    const existing = append ? field.value.split(",").map(tag => tag.trim()).filter(Boolean) : [];
+    field.value = [...new Set([...existing, ...aiResult.value])].join(", ");
+  }
+  element("ai-preview").hidden = true;
+  element("dialog-status").textContent = "적용했습니다. 저장 버튼을 눌러 변경사항을 저장하세요.";
+}
+element("ai-apply").addEventListener("click", () => applyAi(false));
+element("ai-add").addEventListener("click", () => applyAi(true));
 element("show-upload").addEventListener("click", () => { filesPage.hidden = true; uploadPage.hidden = false; });
 element("back-to-files").addEventListener("click", () => { uploadPage.hidden = true; filesPage.hidden = false; });
 element("show-trash").addEventListener("click", async () => {
