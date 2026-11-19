@@ -8,7 +8,7 @@ This is the code of FileFlicker Web version
 - 로그인한 계정이 소유한 파일의 제목 검색, 메타데이터 조회, 다운로드 링크 발급이 가능하다. TXT와 Markdown 파일은 내용도 읽을 수 있다. PDF와 Office 파일의 본문 읽기 및 OCR은 아직 지원하지 않는다.
 - 파일 수정, 업로드, 삭제는 MCP에서 제공하지 않는다. 다운로드 링크는 파일 내용에 접근할 수 있으므로 신뢰하는 앱에만 접근을 허용한다.
 - 인증은 Supabase OAuth를 사용한다. 운영 사이트는 `https://fileflicker.pages.dev`, 동의 화면 경로는 `/oauth/consent`다. 비밀번호, API 키, 토큰은 이 문서에 기록하지 않는다.
-- 현재 MCP와 동의 화면은 배포되어 있으나, MCP 자동 배포가 포함된 커밋은 GitHub 토큰에 저장소 **Workflows: Read and write** 권한이 없어 아직 푸시되지 않았다. 권한을 추가한 뒤 `main`을 푸시하고 GitHub Actions 결과를 확인한다.
+- `main`에 푸시하면 GitHub Actions가 MCP 함수를 포함해 자동 배포한다. 워크플로 파일을 변경해 푸시할 때는 GitHub 토큰에 저장소 **Workflows: Read and write** 권한이 필요하다.
 
 로컬에서 웹 앱을 실행하려면 `npm ci` 후 `npm run dev`를 실행하고 `http://localhost:5173`을 연다. 스타일을 수정한 뒤 이미 실행 중인 서버에 반영하려면 `npm run build:css`를 실행한다.
 
