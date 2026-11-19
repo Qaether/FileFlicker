@@ -63,5 +63,9 @@
   .primary-icon { @apply border-blue-700 bg-blue-700 text-white hover:bg-blue-800; }
   .danger-icon { @apply text-red-600; }
   .message { @apply mt-4 text-sm text-red-700; }
+  #file-form input, #file-form textarea { @apply border-transparent bg-transparent px-2 transition hover:bg-gray-50 focus:border-blue-300 focus:bg-white; }
+  .title-field input { @apply text-xl font-semibold; }
+  .tag-chips { @apply mt-2 flex flex-wrap gap-2; }
+  .tag-chip { @apply inline-flex items-center gap-2 rounded-full bg-blue-50 px-3 py-1 text-sm text-blue-800; }
 }
 @keyframes ai-spin { to { transform: rotate(360deg); } }

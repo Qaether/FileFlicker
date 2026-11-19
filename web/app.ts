@@ -39,6 +39,10 @@ let records: FileRecord[] = [];
 let queue = Promise.resolve();
 let trashView = false;
 let selected: FileRecord | undefined;
+let savedSnapshot = "";
+let saveTimer: ReturnType<typeof setTimeout> | undefined;
+let saving: Promise<boolean> | undefined;
+let tagValues: string[] = [];
 let page = 1;
 const pageSize = 20;
 const dialog = element<HTMLDialogElement>("file-dialog");
@@ -124,19 +128,28 @@ function openFile(file: FileRecord) {
   const set = (name: string, value: string) => { (fileForm.elements.namedItem(name) as HTMLInputElement).value = value; };
   set("title", file.title || file.original_name);
   set("summary", file.summary || "");
-  set("tags", file.tags.join(", "));
+  set("tags", "");
+  tagValues = [...file.tags];
+  renderTags();
+  savedSnapshot = snapshot();
+  element("save-status").textContent = "";
+  element("retry-save").hidden = true;
+  (fileForm.elements.namedItem("title") as HTMLInputElement).readOnly = trashView;
+  element<HTMLTextAreaElement>("summary").readOnly = trashView;
+  element<HTMLInputElement>("tags").hidden = trashView;
   element("ai-preview").hidden = true;
   for (const id of ["generate-summary", "generate-tags"]) element(id).hidden = trashView;
   element("original-name").textContent = `원본 파일명: ${file.original_name}`;
   element("file-info").textContent = `${file.size_bytes.toLocaleString()}바이트 · ${new Date(file.created_at).toLocaleDateString("ko-KR")}`;
   element("dialog-status").textContent = "";
-  for (const id of ["save-file", "download-file", "trash-file"]) element(id).hidden = trashView;
+  for (const id of ["download-file", "trash-file"]) element(id).hidden = trashView;
   for (const id of ["restore-file", "purge-file"]) element(id).hidden = !trashView;
   dialog.showModal();
 }
 
 async function changeFile(action: "trash" | "restore" | "purge") {
   if (!session || !selected) return;
+  if (action === "trash" && !(await saveChanges())) return;
   if (action === "purge" && !window.confirm("이 파일을 영구 삭제하시겠습니까? 복구할 수 없습니다.")) return;
   try {
     await fileAction(session, { action, id: selected.id });
@@ -144,7 +157,11 @@ async function changeFile(action: "trash" | "restore" | "purge") {
     await refresh(session);
   } catch (error) { element("dialog-status").textContent = errorMessage(error); }
 }
-element("close-dialog").addEventListener("click", () => dialog.close());
+async function closeFile() {
+  if (await saveChanges()) dialog.close();
+}
+element("close-dialog").addEventListener("click", () => void closeFile());
+dialog.addEventListener("cancel", (event) => { event.preventDefault(); void closeFile(); });
 element("trash-file").addEventListener("click", () => void changeFile("trash"));
 element("restore-file").addEventListener("click", () => void changeFile("restore"));
 element("purge-file").addEventListener("click", () => void changeFile("purge"));
@@ -155,17 +172,108 @@ element("download-file").addEventListener("click", async () => {
     window.location.assign(result.url);
   } catch (error) { element("dialog-status").textContent = errorMessage(error); }
 });
-fileForm.addEventListener("submit", async (event) => {
-  event.preventDefault();
-  if (!session || !selected) return;
-  const data = new FormData(fileForm);
-  const tags = String(data.get("tags") || "").split(",").map(tag => tag.trim()).filter(Boolean);
-  try {
-    await fileAction(session, { action: "update", id: selected.id, title: String(data.get("title") || ""),
-      summary: String(data.get("summary") || ""), tags });
-    dialog.close();
-    await refresh(session);
-  } catch (error) { element("dialog-status").textContent = errorMessage(error); }
+fileForm.addEventListener("submit", (event) => event.preventDefault());
+
+function renderTags() {
+  const container = element("tag-chips");
+  container.replaceChildren();
+  tagValues.forEach((tag, index) => {
+    const chip = document.createElement("span");
+    chip.className = "tag-chip";
+    chip.append(document.createTextNode(tag));
+    if (!trashView) {
+      const remove = document.createElement("button");
+      remove.type = "button";
+      remove.textContent = "×";
+      remove.setAttribute("aria-label", `${tag} 태그 삭제`);
+      remove.addEventListener("click", () => { tagValues.splice(index, 1); renderTags(); scheduleSave(); });
+      chip.append(remove);
+    }
+    container.append(chip);
+  });
+}
+function commitTags() {
+  const field = element<HTMLInputElement>("tags");
+  const additions = field.value.split(",").map(tag => tag.trim()).filter(Boolean);
+  if (additions.length) {
+    tagValues = [...new Set([...tagValues, ...additions])];
+    field.value = "";
+    renderTags();
+  }
+}
+function snapshot() {
+  return JSON.stringify({
+    title: String(new FormData(fileForm).get("title") || "").trim(),
+    summary: element<HTMLTextAreaElement>("summary").value,
+    tags: tagValues,
+  });
+}
+async function saveChanges(): Promise<boolean> {
+  clearTimeout(saveTimer);
+  if (!selected || trashView) return true;
+  commitTags();
+  if (saving) {
+    if (!(await saving)) return false;
+    if (snapshot() === savedSnapshot) return true;
+  }
+  const current = snapshot();
+  if (current === savedSnapshot) return true;
+  const data = JSON.parse(current) as { title: string; summary: string; tags: string[] };
+  if (!data.title || data.tags.length > 50 || data.tags.some(tag => tag.length > 100)) {
+    element("save-status").textContent = "제목과 태그를 확인해 주세요.";
+    return false;
+  }
+  if (!session) {
+    element("save-status").textContent = "로그인 세션이 만료되었습니다. 내용을 복사한 뒤 다시 로그인해 주세요.";
+    return false;
+  }
+  const id = selected.id;
+  element("save-status").textContent = "저장 중";
+  element("retry-save").hidden = true;
+  saving = (async () => {
+    try {
+      await fileAction(session!, { action: "update", id, ...data });
+      savedSnapshot = current;
+      const record = records.find(file => file.id === id);
+      if (record) { record.title = data.title; record.summary = data.summary; record.tags = data.tags; }
+      renderFiles();
+      element("save-status").textContent = "저장됨";
+      return true;
+    } catch (error) {
+      element("save-status").textContent = `저장 실패: ${errorMessage(error)}`;
+      element("retry-save").hidden = false;
+      return false;
+    }
+  })();
+  const success = await saving;
+  saving = undefined;
+  if (success && snapshot() !== savedSnapshot) return saveChanges();
+  return success;
+}
+function scheduleSave() {
+  clearTimeout(saveTimer);
+  element("save-status").textContent = "저장 대기 중";
+  saveTimer = setTimeout(() => void saveChanges(), 800);
+}
+fileForm.addEventListener("input", (event) => {
+  if ((event.target as HTMLElement).id !== "tags") scheduleSave();
+});
+fileForm.addEventListener("focusout", (event) => {
+  if ((event.target as HTMLElement).id === "tags") commitTags();
+  if (!trashView && snapshot() !== savedSnapshot) void saveChanges();
+});
+element<HTMLInputElement>("tags").addEventListener("keydown", (event) => {
+  if (event.key === "Enter" || event.key === ",") {
+    event.preventDefault();
+    commitTags();
+    scheduleSave();
+  }
+});
+element("retry-save").addEventListener("click", () => void saveChanges());
+window.addEventListener("beforeunload", (event) => {
+  if (dialog.open && !trashView && (saving || snapshot() !== savedSnapshot || element<HTMLInputElement>("tags").value.trim())) {
+    event.preventDefault();
+  }
 });
 
 let aiResult: { kind: "summary"; value: string } | { kind: "tags"; value: string[] } | undefined;
@@ -201,14 +309,15 @@ element("generate-tags").addEventListener("click", () => void generate("tags"));
 element("ai-dismiss").addEventListener("click", () => { element("ai-preview").hidden = true; });
 function applyAi(append: boolean) {
   if (!aiResult) return;
-  const field = element<HTMLInputElement | HTMLTextAreaElement>(aiResult.kind);
-  if (aiResult.kind === "summary") field.value = aiResult.value;
+  if (aiResult.kind === "summary") element<HTMLTextAreaElement>("summary").value = aiResult.value;
   else {
-    const existing = append ? field.value.split(",").map(tag => tag.trim()).filter(Boolean) : [];
-    field.value = [...new Set([...existing, ...aiResult.value])].join(", ");
+    commitTags();
+    tagValues = [...new Set([...(append ? tagValues : []), ...aiResult.value])];
+    renderTags();
   }
   element("ai-preview").hidden = true;
-  element("dialog-status").textContent = "적용했습니다. 저장 버튼을 눌러 변경사항을 저장하세요.";
+  element("dialog-status").textContent = "";
+  scheduleSave();
 }
 element("ai-apply").addEventListener("click", () => applyAi(false));
 element("ai-add").addEventListener("click", () => applyAi(true));
@@ -277,6 +386,7 @@ function showSignedOut() {
 }
 
 logout.addEventListener("click", async () => {
+  if (dialog.open && !(await saveChanges())) return;
   const { error } = await auth.auth.signOut({ scope: "local" });
   showSignedOut();
   if (error) status.textContent = "이 기기에서는 로그아웃했지만 서버 연결에 실패했습니다.";
@@ -284,7 +394,14 @@ logout.addEventListener("click", async () => {
 
 auth.auth.onAuthStateChange((event, current) => {
   if (event === "TOKEN_REFRESHED" && current) session = current.access_token;
-  if (event === "SIGNED_OUT") showSignedOut();
+  if (event === "SIGNED_OUT") {
+    if (dialog.open && !trashView && (saving || snapshot() !== savedSnapshot || element<HTMLInputElement>("tags").value.trim())) {
+      session = undefined;
+      element("save-status").textContent = "로그인 세션이 만료되었습니다. 내용을 복사한 뒤 다시 로그인해 주세요.";
+      return;
+    }
+    showSignedOut();
+  }
 });
 
 async function restoreSession() {

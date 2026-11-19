@@ -60,7 +60,8 @@
       <div class="mt-5 flex items-center justify-between"><label for="summary">요약</label><button id="generate-summary" type="button" class="icon-button" title="AI 생성" aria-label="요약 AI 생성">✦</button></div>
       <textarea id="summary" name="summary" maxlength="20000" rows="5"></textarea>
       <div class="mt-5 flex items-center justify-between"><label for="tags">태그 <span class="field-hint">쉼표로 구분</span></label><button id="generate-tags" type="button" class="icon-button" title="AI 생성" aria-label="태그 AI 생성">✦</button></div>
-      <input id="tags" name="tags">
+      <div id="tag-chips" class="tag-chips"></div>
+      <input id="tags" name="tags" placeholder="태그 입력 후 Enter">
       <p class="metadata">AI 생성 시 파일 내용이 OpenAI로 전송됩니다. TXT, MD, PDF, DOCX 파일을 지원합니다.</p>
       <section id="ai-preview" hidden aria-live="polite" class="mt-4 rounded-lg border border-blue-200 bg-blue-50 p-4">
         <h3 class="font-semibold text-blue-900">AI 생성 결과</h3><p id="ai-result" class="mt-2 whitespace-pre-wrap break-words text-sm text-gray-700"></p>
@@ -68,8 +69,9 @@
       </section>
       <p id="file-info" class="metadata"></p>
       <p id="dialog-status" role="status" class="message"></p>
+      <p id="save-status" role="status" class="metadata"></p>
+      <button id="retry-save" type="button" class="secondary-button" hidden>저장 다시 시도</button>
       <div class="modal-actions">
-        <button id="save-file" class="icon-button primary-icon" title="저장" aria-label="저장">✓</button>
         <button id="trash-file" type="button" class="icon-button danger-icon" title="휴지통으로 이동" aria-label="휴지통으로 이동">🗑</button>
         <button id="restore-file" type="button" hidden class="icon-button" title="복구" aria-label="복구">↶</button>
         <button id="purge-file" type="button" hidden class="icon-button danger-icon" title="영구 삭제" aria-label="영구 삭제">🗑</button>
