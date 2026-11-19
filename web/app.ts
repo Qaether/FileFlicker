@@ -16,7 +16,7 @@ interface FileRecord {
 type FileOperation =
   | { action: "reserve"; name: string; size: number; contentType: string; sha256: string }
   | { action: "complete" | "download" | "trash" | "restore" | "purge"; id: string }
-  | { action: "generate"; id: string; kind: "summary" | "tags"; text: string }
+  | { action: "generate"; id: string; kind: "summary" | "tags"; text: string; images: string[] }
   | { action: "update"; id: string; title: string; summary: string; tags: string[] };
 type Reservation = { id: string; duplicate: true } | { id: string; duplicate?: false; url: string };
 const errorMessage = (error: unknown) => error instanceof Error ? error.message : "요청에 실패했습니다.";
@@ -308,6 +308,7 @@ let aiResult: { kind: "summary"; value: string } | { kind: "tags"; value: string
 async function generate(kind: "summary" | "tags") {
   if (!session || !selected) return;
   const target = selected.id;
+  const filename = selected.original_name;
   const button = element<HTMLButtonElement>(`generate-${kind}`);
   button.disabled = true;
   button.classList.add("loading");
@@ -317,9 +318,9 @@ async function generate(kind: "summary" | "tags") {
   try {
     const download = await fileAction<{ url: string }>(session, { action: "download", id: target });
     const { extractBeginning } = await import("./extract-text");
-    const text = await extractBeginning(download.url, selected.original_name);
+    const source = await extractBeginning(download.url, filename);
     if (!dialog.open || selected?.id !== target || !session) return;
-    const result = await fileAction<{ summary?: string; tags?: string[] }>(session, { action: "generate", id: target, kind, text });
+    const result = await fileAction<{ summary?: string; tags?: string[] }>(session, { action: "generate", id: target, kind, ...source });
     if (!dialog.open || selected?.id !== target) return;
     if (kind === "summary" && typeof result.summary === "string") aiResult = { kind, value: result.summary };
     else if (kind === "tags" && Array.isArray(result.tags)) aiResult = { kind, value: result.tags };
