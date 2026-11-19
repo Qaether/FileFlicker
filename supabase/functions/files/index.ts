@@ -2,14 +2,13 @@ import { CopyObjectCommand, DeleteObjectCommand, GetObjectCommand, PutObjectComm
 import { getSignedUrl } from "npm:@aws-sdk/s3-request-presigner@3.922.0";
 import { createHash } from "node:crypto";
 import { getFileOwner } from "../_shared/auth.ts";
+import { unsupportedUploadReason, uploadSizeReason } from "../_shared/upload-rules.ts";
 
 const env = (name: string) => Deno.env.get(name) ?? "";
 const projectUrl = env("SUPABASE_URL");
 const publicKey = JSON.parse(env("SUPABASE_PUBLISHABLE_KEYS") || "{}").default ?? env("SUPABASE_ANON_KEY");
 const secretKey = JSON.parse(env("SUPABASE_SECRET_KEYS") || "{}").default ?? env("SUPABASE_SERVICE_ROLE_KEY");
 const bucket = env("R2_BUCKET_NAME");
-const uploadLimitBytes = 50_000_000;
-const videoExtension = /\.(?:3g2|3gp|avi|flv|m2ts|m4v|mkv|mov|mp4|mpeg|mpg|mts|ogv|ts|webm|wmv)$/i;
 const storage = new S3Client({
   region: "auto",
   endpoint: `https://${env("R2_ACCOUNT_ID")}.r2.cloudflarestorage.com`,
@@ -67,13 +66,10 @@ Deno.serve(async (request) => {
         !Number.isSafeInteger(size) || size < 0) {
         return reply({ error: "Invalid file metadata" }, 400);
       }
-      if (videoExtension.test(name.trim()) ||
-        (typeof contentType === "string" && /^video\//i.test(contentType.trim()))) {
-        return reply({ error: "FileFlicker는 동영상 업로드를 지원하지 않습니다." }, 415);
-      }
-      if (size >= uploadLimitBytes) {
-        return reply({ error: "파일은 50 MB 미만만 업로드할 수 있습니다. 이미지는 압축하고, 문서는 필요한 부분을 나눠 다시 선택해 주세요." }, 413);
-      }
+      const formatError = unsupportedUploadReason(name, typeof contentType === "string" ? contentType : "");
+      if (formatError) return reply({ error: formatError }, 415);
+      const sizeError = uploadSizeReason(size);
+      if (sizeError) return reply({ error: sizeError }, 413);
       const id = crypto.randomUUID();
       await files(new URLSearchParams({ on_conflict: "owner_id,sha256" }), "POST", {
         id, owner_id: user.id, original_name: name, sha256, size_bytes: size,
@@ -100,7 +96,7 @@ Deno.serve(async (request) => {
     const object = { Bucket: bucket, Key: file.object_key };
     if (input.action === "generate" && file.upload_status === "uploaded") {
       if (!["summary", "tags"].includes(input.kind)) return reply({ error: "잘못된 생성 요청입니다." }, 400);
-      if (!/\.(txt|md|pdf|docx)$/i.test(file.original_name)) return reply({ error: "TXT, MD, PDF, DOCX 파일만 AI 생성이 가능합니다." }, 415);
+      if (!/\.(txt|md|pdf|docx|pptx)$/i.test(file.original_name)) return reply({ error: "TXT, MD, PDF, DOCX, PPTX 파일만 AI 생성이 가능합니다." }, 415);
       if (typeof input.text !== "string" || !input.text.trim() || input.text.length > 20000) {
         return reply({ error: "읽을 수 있는 텍스트가 없습니다." }, 400);
       }
@@ -162,7 +158,10 @@ Deno.serve(async (request) => {
     }
     if (input.action === "complete") {
       if (file.upload_status === "uploaded") return reply({ id: file.id });
-      if (file.size_bytes >= uploadLimitBytes) return reply({ error: "업로드 한도인 50 MB를 초과했습니다." }, 413);
+      const formatError = unsupportedUploadReason(file.original_name);
+      if (formatError) return reply({ error: formatError }, 415);
+      const sizeError = uploadSizeReason(file.size_bytes);
+      if (sizeError) return reply({ error: sizeError }, 413);
       const stagingKey = `pending/${file.object_key}`;
       const info = await storage.send(new GetObjectCommand({ Bucket: bucket, Key: stagingKey })).catch((error) => {
         if (error?.$metadata?.httpStatusCode === 404) return null;

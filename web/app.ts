@@ -1,4 +1,4 @@
-import { exclusionReason } from "./upload-rules";
+import { unsupportedUploadReason, uploadExtensions, uploadSizeReason } from "../supabase/functions/_shared/upload-rules";
 import { matchesFile } from "./file-search";
 import { createClient } from "@supabase/supabase-js";
 
@@ -33,6 +33,7 @@ const login = element<HTMLFormElement>("login");
 const logout = element("logout");
 const drop = element("drop");
 const picker = element<HTMLInputElement>("pick");
+picker.accept = uploadExtensions.join(",");
 const search = element<HTMLInputElement>("search");
 const status = element("status");
 let session: string | undefined;
@@ -457,7 +458,7 @@ function enqueue(files: Iterable<File>) {
     const row = document.createElement("li");
     element("uploads").append(row);
     const report = (message: string) => { row.textContent = `${file.name} — ${message}`; };
-    const reason = exclusionReason(file);
+    const reason = unsupportedUploadReason(file.name, file.type) ?? uploadSizeReason(file.size);
     if (reason) {
       report(`제외 (${file.size.toLocaleString()}바이트). ${reason}`);
       continue;
