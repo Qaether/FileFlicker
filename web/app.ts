@@ -152,6 +152,7 @@ async function refresh(token: string) {
 }
 
 function openFile(file: FileRecord) {
+  detailVersion++;
   selected = file;
   const set = (name: string, value: string) => { (fileForm.elements.namedItem(name) as HTMLInputElement).value = value; };
   set("title", file.title || file.original_name);
@@ -165,8 +166,12 @@ function openFile(file: FileRecord) {
   (fileForm.elements.namedItem("title") as HTMLInputElement).readOnly = trashView;
   element<HTMLTextAreaElement>("summary").readOnly = trashView;
   element<HTMLInputElement>("tags").hidden = trashView;
-  element("ai-preview").hidden = true;
-  for (const id of ["generate-summary", "generate-tags"]) element(id).hidden = trashView;
+  for (const kind of aiKinds) {
+    clearAi(kind);
+    const button = element<HTMLButtonElement>(`generate-${kind}`);
+    button.hidden = trashView;
+    setAiLoading(button, false);
+  }
   element("original-name").textContent = `원본 파일명: ${file.original_name}`;
   element("file-info").textContent = `${file.size_bytes.toLocaleString()}바이트 · ${new Date(file.created_at).toLocaleDateString("ko-KR")}`;
   element("dialog-status").textContent = "";
@@ -304,52 +309,75 @@ window.addEventListener("beforeunload", (event) => {
   }
 });
 
-let aiResult: { kind: "summary"; value: string } | { kind: "tags"; value: string[] } | undefined;
-async function generate(kind: "summary" | "tags") {
+const aiKinds = ["summary", "tags"] as const;
+type AiKind = typeof aiKinds[number];
+const aiResults: { summary?: string; tags?: string[] } = {};
+let detailVersion = 0;
+
+function clearAi(kind: AiKind) {
+  delete aiResults[kind];
+  element(`ai-${kind}-preview`).hidden = true;
+  const status = element(`ai-${kind}-status`);
+  status.hidden = true;
+  status.textContent = "";
+}
+
+function setAiLoading(button: HTMLButtonElement, loading: boolean) {
+  button.disabled = loading;
+  button.classList.toggle("loading", loading);
+  if (loading) button.setAttribute("aria-busy", "true");
+  else button.removeAttribute("aria-busy");
+}
+
+async function generate(kind: AiKind) {
   if (!session || !selected) return;
   const target = selected.id;
   const filename = selected.original_name;
+  const version = detailVersion;
+  const isCurrent = () => dialog.open && detailVersion === version && selected?.id === target;
   const button = element<HTMLButtonElement>(`generate-${kind}`);
-  button.disabled = true;
-  button.classList.add("loading");
-  button.setAttribute("aria-busy", "true");
-  element("dialog-status").textContent = "";
-  element("ai-preview").hidden = true;
+  setAiLoading(button, true);
+  clearAi(kind);
   try {
     const download = await fileAction<{ url: string }>(session, { action: "download", id: target });
     const { extractBeginning } = await import("./extract-text");
     const source = await extractBeginning(download.url, filename);
-    if (!dialog.open || selected?.id !== target || !session) return;
+    if (!isCurrent() || !session) return;
     const result = await fileAction<{ summary?: string; tags?: string[] }>(session, { action: "generate", id: target, kind, ...source });
-    if (!dialog.open || selected?.id !== target) return;
-    if (kind === "summary" && typeof result.summary === "string") aiResult = { kind, value: result.summary };
-    else if (kind === "tags" && Array.isArray(result.tags)) aiResult = { kind, value: result.tags };
+    if (!isCurrent()) return;
+    if (kind === "summary" && typeof result.summary === "string") aiResults.summary = result.summary;
+    else if (kind === "tags" && Array.isArray(result.tags)) aiResults.tags = result.tags;
     else throw new Error("AI 결과를 읽지 못했습니다.");
-    element("ai-result").textContent = typeof aiResult.value === "string" ? aiResult.value : aiResult.value.join(", ");
-    element("ai-add").hidden = kind !== "tags";
-    element("ai-preview").hidden = false;
-    element("dialog-status").textContent = "결과를 확인하고 적용하세요.";
+    element(`ai-${kind}-result`).textContent = (kind === "summary" ? aiResults.summary : aiResults.tags?.join(", ")) ?? "";
+    element(`ai-${kind}-preview`).hidden = false;
   } catch (error) {
-    if (dialog.open && selected?.id === target) element("dialog-status").textContent = errorMessage(error);
-  } finally { button.disabled = false; button.classList.remove("loading"); button.removeAttribute("aria-busy"); }
+    if (isCurrent()) {
+      const status = element(`ai-${kind}-status`);
+      status.hidden = false;
+      status.textContent = errorMessage(error);
+    }
+  } finally { if (detailVersion === version) setAiLoading(button, false); }
 }
-element("generate-summary").addEventListener("click", () => void generate("summary"));
-element("generate-tags").addEventListener("click", () => void generate("tags"));
-element("ai-dismiss").addEventListener("click", () => { element("ai-preview").hidden = true; });
-function applyAi(append: boolean) {
-  if (!aiResult) return;
-  if (aiResult.kind === "summary") element<HTMLTextAreaElement>("summary").value = aiResult.value;
-  else {
+function applyAi(kind: AiKind, append = false) {
+  if (kind === "summary") {
+    if (aiResults.summary === undefined) return;
+    element<HTMLTextAreaElement>("summary").value = aiResults.summary;
+  } else {
+    const tags = aiResults.tags;
+    if (!tags) return;
     commitTags();
-    tagValues = [...new Set([...(append ? tagValues : []), ...aiResult.value])];
+    tagValues = [...new Set([...(append ? tagValues : []), ...tags])];
     renderTags();
   }
-  element("ai-preview").hidden = true;
-  element("dialog-status").textContent = "";
+  clearAi(kind);
   scheduleSave();
 }
-element("ai-apply").addEventListener("click", () => applyAi(false));
-element("ai-add").addEventListener("click", () => applyAi(true));
+for (const kind of aiKinds) {
+  element(`generate-${kind}`).addEventListener("click", () => void generate(kind));
+  element(`ai-${kind}-dismiss`).addEventListener("click", () => clearAi(kind));
+  element(`ai-${kind}-apply`).addEventListener("click", () => applyAi(kind));
+}
+element("ai-tags-add").addEventListener("click", () => applyAi("tags", true));
 element("show-upload").addEventListener("click", () => { filesPage.hidden = true; uploadPage.hidden = false; });
 element("back-to-files").addEventListener("click", () => {
   uploadPage.hidden = true;
