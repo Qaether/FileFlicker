@@ -1,4 +1,5 @@
 import { exclusionReason } from "./upload-rules";
+import { createClient } from "@supabase/supabase-js";
 
 interface FileRecord {
   id: string;
@@ -21,6 +22,7 @@ const errorMessage = (error: unknown) => error instanceof Error ? error.message 
 
 const url = "https://elbepqrahykhefjdlnqn.supabase.co";
 const key = "sb_publishable_SYqVjlSMZ_RGR6Tat5Q9cg_UhPc9GHK";
+const auth = createClient(url, key, { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: false } });
 function element<T extends HTMLElement = HTMLElement>(id: string): T {
   const target = document.getElementById(id);
   if (!target) throw new Error(`Missing element: ${id}`);
@@ -46,7 +48,11 @@ const uploadPage = element("upload-page");
 
 async function api<T>(path: string, { body, token }: { body?: object; token?: string } = {}): Promise<T> {
   const headers = new Headers({ apikey: key });
-  if (token) headers.set("authorization", `Bearer ${token}`);
+  if (token) {
+    const { data, error } = await auth.auth.getSession();
+    if (error || !data.session) throw new Error("로그인 세션이 만료되었습니다. 다시 로그인해 주세요.");
+    headers.set("authorization", `Bearer ${data.session.access_token}`);
+  }
   if (body) headers.set("content-type", "application/json");
   const response = await fetch(url + path, {
     method: body ? "POST" : "GET", headers, body: body ? JSON.stringify(body) : undefined,
@@ -97,11 +103,11 @@ async function refresh(token: string) {
   const batchSize = 500;
   for (let offset = 0; ; offset += batchSize) {
     const batch = await api<FileRecord[]>(`/rest/v1/files?select=id,original_name,title,size_bytes,created_at,deleted_at,summary,category,tags&upload_status=eq.uploaded&deleted_at=${deleted}&order=created_at.desc,id.desc&limit=${batchSize}&offset=${offset}`, { token });
-    if (session !== token || trashView !== view) return;
+    if (!session || trashView !== view) return;
     rows.push(...batch);
     if (batch.length < batchSize) break;
   }
-  if (session !== token) return;
+  if (!session) return;
   records = rows;
   renderFiles();
 }
@@ -181,9 +187,13 @@ login.addEventListener("submit", async (event) => {
   button.disabled = true;
   status.textContent = "";
   try {
-    const credentials = Object.fromEntries(new FormData(login));
-    const result = await api<{ access_token: string }>("/auth/v1/token?grant_type=password", { body: credentials });
-    session = result.access_token;
+    const credentials = new FormData(login);
+    const { data, error } = await auth.auth.signInWithPassword({
+      email: String(credentials.get("email") || ""),
+      password: String(credentials.get("password") || ""),
+    });
+    if (error || !data.session) throw error || new Error("로그인하지 못했습니다.");
+    session = data.session.access_token;
     login.reset();
     login.hidden = true;
     logout.hidden = false;
@@ -196,7 +206,7 @@ login.addEventListener("submit", async (event) => {
   }
 });
 
-logout.addEventListener("click", () => {
+function showSignedOut() {
   if (dialog.open) dialog.close();
   trashView = false;
   element("files-heading").textContent = "저장된 파일";
@@ -211,7 +221,30 @@ logout.addEventListener("click", () => {
   logout.hidden = true;
   login.hidden = false;
   status.textContent = "";
+}
+
+logout.addEventListener("click", async () => {
+  const { error } = await auth.auth.signOut({ scope: "local" });
+  showSignedOut();
+  if (error) status.textContent = "이 기기에서는 로그아웃했지만 서버 연결에 실패했습니다.";
 });
+
+auth.auth.onAuthStateChange((event, current) => {
+  if (event === "TOKEN_REFRESHED" && current) session = current.access_token;
+  if (event === "SIGNED_OUT") showSignedOut();
+});
+
+async function restoreSession() {
+  const { data, error } = await auth.auth.getSession();
+  if (error || !data.session) return;
+  session = data.session.access_token;
+  login.hidden = true;
+  logout.hidden = false;
+  element("library").hidden = false;
+  try { await refresh(session); }
+  catch (error) { status.textContent = errorMessage(error); }
+}
+void restoreSession();
 
 function enqueue(files: Iterable<File>) {
   if (!session) return;
@@ -228,11 +261,11 @@ function enqueue(files: Iterable<File>) {
     report("대기 중");
     queue = queue.then(async () => {
       try {
-        if (session !== token) return;
+        if (!session) return;
         report("중복 확인 중");
         const digest = await crypto.subtle.digest("SHA-256", await file.arrayBuffer());
         const sha256 = Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
-        if (session !== token) return;
+        if (!session) return;
         const reservation = await fileAction<Reservation>(token, {
           action: "reserve",
           name: file.name, size: file.size, contentType: file.type, sha256,
@@ -241,11 +274,11 @@ function enqueue(files: Iterable<File>) {
           report("이미 보관 중");
           return;
         }
-        if (session !== token) return;
+        if (!session) return;
         report("업로드 중");
         const response = await fetch(reservation.url, { method: "PUT", body: file });
         if (!response.ok) throw new Error(`저장소 응답 ${response.status}`);
-        if (session !== token) return;
+        if (!session) return;
         await fileAction(token, { action: "complete", id: reservation.id });
         report("업로드 완료");
         await refresh(token).catch(() => { status.textContent = "파일 목록을 새로 고치지 못했습니다."; });
