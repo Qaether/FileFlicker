@@ -53,7 +53,7 @@ jobs:
         run: |
           set -eu
           supabase secrets set "APP_ORIGIN=$APP_ORIGIN" --remote="$SUPABASE_PROJECT_REF" --yes
-          supabase functions deploy files --project-ref "$SUPABASE_PROJECT_REF" --use-api
+          supabase functions deploy files --remote="$SUPABASE_PROJECT_REF" --use-api --yes
           status=$(curl -sS -o /dev/null -w '%{http_code}' -X OPTIONS \
             -H "Origin: $APP_ORIGIN" -H 'Access-Control-Request-Method: POST' \
             "https://$SUPABASE_PROJECT_REF.supabase.co/functions/v1/files")
