@@ -9,7 +9,7 @@
 }
 
 @layer components {
-  main { @apply mx-auto max-w-4xl px-5 pb-16; }
+  main { @apply w-full px-5 pb-16 sm:px-8; }
   header { @apply mb-10 flex items-center justify-between border-b border-slate-800 py-6; }
   h1 { @apply text-xl font-extrabold tracking-tight; }
   h2 { @apply text-2xl font-bold tracking-tight; }
@@ -27,4 +27,5 @@
   #uploads li, #files li { @apply my-2 rounded-xl border border-slate-800 bg-slate-900 px-4 py-3 text-sm break-all; }
   #files li { @apply flex items-center justify-between gap-3; }
   #status { @apply mx-auto mt-4 max-w-md text-sm text-amber-200; }
+  .icon-button { @apply inline-flex h-11 w-11 items-center justify-center rounded-lg border border-slate-700 text-xl text-slate-200 hover:bg-slate-700 disabled:opacity-40; }
 }

@@ -37,6 +37,8 @@ let records: FileRecord[] = [];
 let queue = Promise.resolve();
 let trashView = false;
 let selected: FileRecord | undefined;
+let page = 1;
+const pageSize = 20;
 const dialog = element<HTMLDialogElement>("file-dialog");
 const fileForm = element<HTMLFormElement>("file-form");
 const filesPage = element("files-heading").closest("section")!;
@@ -62,25 +64,43 @@ function renderFiles() {
   const query = search.value.trim().toLocaleLowerCase();
   const list = element("files");
   list.replaceChildren();
-  for (const file of records) {
+  const filtered = records.filter((file) => {
     const text = [file.title, file.original_name, file.category, file.summary, ...file.tags].join(" ");
-    if (!text.toLocaleLowerCase().includes(query)) continue;
+    return text.toLocaleLowerCase().includes(query);
+  });
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+  page = Math.min(page, totalPages);
+  for (const file of filtered.slice((page - 1) * pageSize, page * pageSize)) {
     const row = document.createElement("li");
     const button = document.createElement("button");
     button.textContent = file.title || file.original_name;
-    button.className = "w-full text-left";
+    button.className = "min-w-0 w-full truncate text-left";
+    button.title = file.title || file.original_name;
     button.addEventListener("click", () => openFile(file));
     row.append(button);
     list.append(row);
   }
-  element("files-state").textContent = list.childElementCount
-    ? `${list.childElementCount}개 파일`
+  element("files-state").textContent = filtered.length
+    ? `${filtered.length}개 파일`
     : query ? "검색 조건에 맞는 파일이 없습니다." : trashView ? "휴지통이 비어 있습니다." : "저장된 파일이 없습니다.";
+  element("page-state").textContent = `${page} / ${totalPages}`;
+  element<HTMLButtonElement>("previous-page").disabled = page <= 1;
+  element<HTMLButtonElement>("next-page").disabled = page >= totalPages;
 }
+element("previous-page").addEventListener("click", () => { if (page > 1) { page--; renderFiles(); } });
+element("next-page").addEventListener("click", () => { page++; renderFiles(); });
 
 async function refresh(token: string) {
   const deleted = trashView ? "not.is.null" : "is.null";
-  const rows = await api<FileRecord[]>(`/rest/v1/files?select=id,original_name,title,size_bytes,created_at,deleted_at,summary,category,tags&upload_status=eq.uploaded&deleted_at=${deleted}&order=created_at.desc`, { token });
+  const view = trashView;
+  const rows: FileRecord[] = [];
+  const batchSize = 500;
+  for (let offset = 0; ; offset += batchSize) {
+    const batch = await api<FileRecord[]>(`/rest/v1/files?select=id,original_name,title,size_bytes,created_at,deleted_at,summary,category,tags&upload_status=eq.uploaded&deleted_at=${deleted}&order=created_at.desc,id.desc&limit=${batchSize}&offset=${offset}`, { token });
+    if (session !== token || trashView !== view) return;
+    rows.push(...batch);
+    if (batch.length < batchSize) break;
+  }
   if (session !== token) return;
   records = rows;
   renderFiles();
@@ -138,6 +158,7 @@ element("back-to-files").addEventListener("click", () => { uploadPage.hidden = t
 element("show-trash").addEventListener("click", async () => {
   if (!session) return;
   trashView = !trashView;
+  page = 1;
   element("files-heading").textContent = trashView ? "휴지통" : "저장된 파일";
   element("show-trash").textContent = trashView ? "파일 목록" : "휴지통";
   try { await refresh(session); } catch (error) { status.textContent = errorMessage(error); }
@@ -249,4 +270,4 @@ drop.addEventListener("drop", (event) => {
   drop.classList.remove("active");
   if (event.dataTransfer) enqueue(event.dataTransfer.files);
 });
-search.addEventListener("input", renderFiles);
+search.addEventListener("input", () => { page = 1; renderFiles(); });
