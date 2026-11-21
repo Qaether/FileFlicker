@@ -571,3 +571,34 @@ if ("serviceWorker" in navigator) {
     void navigator.serviceWorker.register("/sw.js").catch(() => {});
   });
 }
+
+type InstallPromptEvent = Event & {
+  prompt(): Promise<void>;
+  userChoice: Promise<{ outcome: "accepted" | "dismissed" }>;
+};
+const installButton = element<HTMLButtonElement>("install-app");
+let installPrompt: InstallPromptEvent | undefined;
+const isStandalone = window.matchMedia("(display-mode: standalone)").matches || Boolean((navigator as { standalone?: boolean }).standalone);
+const isIos = /iPhone|iPad|iPod/i.test(navigator.userAgent);
+if (!isStandalone && isIos) installButton.hidden = false;
+window.addEventListener("beforeinstallprompt", (event) => {
+  event.preventDefault();
+  installPrompt = event as InstallPromptEvent;
+  if (!isStandalone) installButton.hidden = false;
+});
+window.addEventListener("appinstalled", () => {
+  installPrompt = undefined;
+  installButton.hidden = true;
+});
+installButton.addEventListener("click", async () => {
+  if (installPrompt) {
+    await installPrompt.prompt();
+    const { outcome } = await installPrompt.userChoice;
+    installPrompt = undefined;
+    if (outcome === "accepted") installButton.hidden = true;
+    return;
+  }
+  if (isIos) {
+    window.alert("iPhone/iPad에서는 Safari 하단 공유 버튼(□↑)을 누른 뒤 ‘홈 화면에 추가’를 선택해 설치할 수 있습니다.");
+  }
+});
