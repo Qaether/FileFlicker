@@ -1,5 +1,7 @@
 # FileFlicker 완료 기록
 
+- FileFlicker 웹 앱을 PWA로 구성(`manifest.webmanifest`, `sw.js`, 앱 아이콘 192/512/SVG/Apple Touch Icon, 서비스 워커 등록)하고, 파일 삭제(휴지통 이동) 시 확인 팝업을 띄우도록 추가했다. TypeScript 타입 검사와 프로덕션 빌드를 통과했고 `dist/`에 PWA 자산이 포함됨을 확인했다. 실제 브라우저/모바일에서 PWA 설치 및 삭제 확인 팝업 통합 검증과 운영 배포는 남아 있다.
+
 - 신규 업로드 허용 확장자에 `.xlsx`를 추가하고 화면 안내 문구와 구현 계획(`implemenation.md`)을 갱신했다. TypeScript 타입 검사와 프로덕션 빌드를 통과했다. 실제 브라우저에서 `.xlsx` 업로드 통합 검증과 운영 배포는 남아 있다.
 
 - 태그 입력란에서 한글 등 IME 조합 중에 `Enter` 또는 `,` 입력 시 마지막 글자가 중복 추가되던 문제를 `compositionstart`/`compositionend`, `isComposing`, `input` 이벤트 처리로 수정했다. TypeScript 타입 검사와 프로덕션 빌드를 통과했다. 실제 브라우저에서 한글 IME 입력 통합 검증은 남아 있다.

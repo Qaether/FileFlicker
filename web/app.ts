@@ -182,6 +182,7 @@ function openFile(file: FileRecord) {
 
 async function changeFile(action: "trash" | "restore" | "purge") {
   if (!session || !selected) return;
+  if (action === "trash" && !window.confirm("이 파일을 휴지통으로 이동하시겠습니까?")) return;
   if (action === "trash" && !(await saveChanges())) return;
   if (action === "purge" && !window.confirm("이 파일을 영구 삭제하시겠습니까? 복구할 수 없습니다.")) return;
   try {
@@ -565,3 +566,8 @@ drop.addEventListener("drop", (event) => {
   if (event.dataTransfer) enqueue(event.dataTransfer.files);
 });
 search.addEventListener("input", () => { page = 1; renderFiles(); });
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    void navigator.serviceWorker.register("/sw.js").catch(() => {});
+  });
+}
