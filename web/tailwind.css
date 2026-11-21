@@ -1,4 +1,4 @@
-﻿@import "tailwindcss" source(none);
+@import "tailwindcss" source(none);
 @source "./index.html";
 @source "./app.ts";
 
@@ -24,11 +24,11 @@
   .primary-button { @apply inline-flex items-center justify-center rounded-lg bg-blue-700 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-800 disabled:cursor-wait disabled:opacity-60; }
   .secondary-button, .back-button { @apply inline-flex items-center justify-center rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 transition hover:bg-gray-50; }
   .back-button { @apply mb-6; }
-  #login { @apply mx-auto mt-12 max-w-md rounded-2xl border border-gray-200 bg-white p-7 shadow-sm sm:p-10; }
-  #login h2 { @apply text-2xl; }
-  #login label, #file-form label { @apply mt-5 block text-sm font-medium text-gray-700; }
-  #login input, #search, #file-form input, #file-form textarea { @apply mt-2 block w-full rounded-lg border border-gray-300 bg-gray-50 px-4 py-3 text-sm text-gray-900 placeholder:text-gray-400; }
-  #login button { @apply mt-6 w-full; }
+  #login, #signup { @apply mx-auto mt-12 max-w-md rounded-2xl border border-gray-200 bg-white p-7 shadow-sm sm:p-10; }
+  #login h2, #signup h2 { @apply text-2xl; }
+  #login label, #signup label, #file-form label { @apply mt-5 block text-sm font-medium text-gray-700; }
+  #login input, #signup input, #search, #file-form input, #file-form textarea { @apply mt-2 block w-full rounded-lg border border-gray-300 bg-gray-50 px-4 py-3 text-sm text-gray-900 placeholder:text-gray-400; }
+  #login button, #signup button { @apply mt-4 w-full; }
   .list-toolbar { @apply flex flex-col gap-3 border-b border-gray-200 p-4 sm:flex-row sm:items-center; }
   .search-label { @apply flex-1; }
   #search { @apply mt-0 bg-white; }
@@ -51,8 +51,8 @@
   #pick:focus-visible + label { @apply outline-2 outline-offset-4 outline-blue-600; }
   #limits { @apply mt-5 text-sm text-gray-500; }
   #uploads li { @apply mt-3 rounded-lg border border-gray-200 bg-white p-4 text-sm break-all; }
-  #file-dialog { @apply m-auto max-h-[90vh] w-[min(94vw,60rem)] max-w-none overflow-y-auto rounded-2xl border border-gray-200 bg-white p-6 text-gray-900 shadow-2xl backdrop:bg-gray-950/50 sm:p-8; }
-  #file-dialog .icon-button { @apply h-8 w-8 text-base; }
+  #file-dialog, #admin-dialog { @apply m-auto max-h-[90vh] w-[min(94vw,60rem)] max-w-none overflow-y-auto rounded-2xl border border-gray-200 bg-white p-6 text-gray-900 shadow-2xl backdrop:bg-gray-950/50 sm:p-8; }
+  #file-dialog .icon-button, #admin-dialog .icon-button { @apply h-8 w-8 text-base; }
   #file-dialog .icon-button.loading::after { width: .9rem; height: .9rem; }
   .modal-heading { @apply flex items-start justify-between border-b border-gray-100 pb-5; }
   .modal-heading h2 { @apply text-2xl; }

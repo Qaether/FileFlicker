@@ -13,11 +13,24 @@ interface FileRecord {
   tags: string[];
 }
 
+type AccountStatus = "pending" | "approved" | "rejected";
+interface ProfileRecord {
+  id: string;
+  email: string;
+  role: "admin" | "user";
+  status: AccountStatus;
+  note: string | null;
+  created_at: string;
+  approved_at: string | null;
+}
+
 type FileOperation =
   | { action: "reserve"; name: string; size: number; contentType: string; sha256: string }
   | { action: "complete" | "download" | "trash" | "restore" | "purge"; id: string }
   | { action: "generate"; id: string; kind: "summary" | "tags"; text: string; images: string[] }
-  | { action: "update"; id: string; title: string; summary: string; tags: string[] };
+  | { action: "update"; id: string; title: string; summary: string; tags: string[] }
+  | { action: "admin_users" }
+  | { action: "admin_set_status"; targetId: string; status: AccountStatus };
 type Reservation = { id: string; duplicate: true } | { id: string; duplicate?: false; url: string };
 const errorMessage = (error: unknown) => error instanceof Error ? error.message : "요청에 실패했습니다.";
 
@@ -30,6 +43,10 @@ function element<T extends HTMLElement = HTMLElement>(id: string): T {
   return target as T;
 }
 const login = element<HTMLFormElement>("login");
+const signup = element<HTMLFormElement>("signup");
+const pendingView = element("pending-view");
+const showAdmin = element<HTMLButtonElement>("show-admin");
+const adminDialog = element<HTMLDialogElement>("admin-dialog");
 const logout = element("logout");
 const drop = element("drop");
 const picker = element<HTMLInputElement>("pick");
@@ -37,6 +54,7 @@ picker.accept = uploadExtensions.join(",");
 const search = element<HTMLInputElement>("search");
 const status = element("status");
 let session: string | undefined;
+let currentUserId: string | undefined;
 let records: FileRecord[] = [];
 let queue = Promise.resolve();
 let trashView = false;
@@ -432,6 +450,162 @@ element("refresh-files").addEventListener("click", async () => {
   }
 });
 
+const accountStatusLabel: Record<AccountStatus, string> = {
+  pending: "승인 대기",
+  approved: "승인됨",
+  rejected: "거절/정지",
+};
+
+async function loadSessionState(accessToken: string, userId: string) {
+  session = accessToken;
+  currentUserId = userId;
+  login.hidden = true;
+  signup.hidden = true;
+  logout.hidden = false;
+  const profiles = await api<Array<Pick<ProfileRecord, "id" | "email" | "role" | "status">>>(
+    `/rest/v1/profiles?select=id,email,role,status&id=eq.${encodeURIComponent(userId)}`,
+    { token: accessToken },
+  );
+  const profile = profiles[0];
+  if (!profile || profile.status !== "approved") {
+    element("library").hidden = true;
+    element("oauth-consent").hidden = true;
+    showAdmin.hidden = true;
+    pendingView.hidden = false;
+    const rejected = profile?.status === "rejected";
+    element("pending-title").textContent = rejected ? "계정 사용이 제한되었습니다" : "관리자 승인 대기 중입니다";
+    element("pending-message").textContent = rejected
+      ? "가입 신청이 승인되지 않았거나 이용이 제한되었습니다. 관리자에게 문의해 주세요."
+      : `${profile?.email || "현재 계정"}의 승인 요청이 접수되어 있습니다. 관리자가 승인하면 바로 이용할 수 있습니다.`;
+    return;
+  }
+  pendingView.hidden = true;
+  showAdmin.hidden = profile.role !== "admin";
+  element("library").hidden = false;
+  if (authorizationId) await showConsent();
+  else await refresh(accessToken);
+}
+
+async function loadAdminUsers() {
+  if (!session) return;
+  const adminStatus = element("admin-status");
+  adminStatus.textContent = "불러오는 중...";
+  try {
+    const { users } = await fileAction<{ users: ProfileRecord[] }>(session, { action: "admin_users" });
+    const list = element("admin-users");
+    list.replaceChildren();
+    const order: Record<AccountStatus, number> = { pending: 0, approved: 1, rejected: 2 };
+    users.sort((a, b) => order[a.status] - order[b.status] || b.created_at.localeCompare(a.created_at));
+    for (const user of users) {
+      const item = document.createElement("li");
+      item.className = "flex flex-wrap items-center justify-between gap-3 py-3 text-sm";
+      const info = document.createElement("div");
+      info.className = "min-w-0 flex-1";
+      const title = document.createElement("p");
+      title.className = "font-medium text-gray-900 break-all";
+      title.textContent = `${user.email} · ${user.role === "admin" ? "관리자" : accountStatusLabel[user.status]}`;
+      const meta = document.createElement("p");
+      meta.className = "text-xs text-gray-500";
+      meta.textContent = [
+        new Date(user.created_at).toLocaleString("ko-KR"),
+        user.note ? `메모: ${user.note}` : "",
+      ].filter(Boolean).join(" · ");
+      info.append(title, meta);
+      item.append(info);
+      if (user.id !== currentUserId) {
+        const actions = document.createElement("div");
+        actions.className = "flex shrink-0 gap-2";
+        const addBtn = (label: string, nextStatus: AccountStatus, cls: string) => {
+          const btn = document.createElement("button");
+          btn.type = "button";
+          btn.className = cls;
+          btn.textContent = label;
+          btn.addEventListener("click", async () => {
+            if (!session) return;
+            btn.disabled = true;
+            adminStatus.textContent = "";
+            try {
+              await fileAction(session, { action: "admin_set_status", targetId: user.id, status: nextStatus });
+              await loadAdminUsers();
+            } catch (error) {
+              adminStatus.textContent = errorMessage(error);
+              btn.disabled = false;
+            }
+          });
+          actions.append(btn);
+        };
+        if (user.status !== "approved") addBtn("승인", "approved", "primary-button");
+        if (user.status === "pending") addBtn("거절", "rejected", "secondary-button");
+        else if (user.status === "approved") addBtn("정지", "rejected", "secondary-button");
+        item.append(actions);
+      }
+      list.append(item);
+    }
+    adminStatus.textContent = users.length ? "" : "등록된 계정이 없습니다.";
+  } catch (error) {
+    adminStatus.textContent = errorMessage(error);
+  }
+}
+
+showAdmin.addEventListener("click", () => {
+  adminDialog.showModal();
+  void loadAdminUsers();
+});
+element("admin-refresh").addEventListener("click", () => void loadAdminUsers());
+element("close-admin").addEventListener("click", () => adminDialog.close());
+
+element("show-signup").addEventListener("click", () => {
+  status.textContent = "";
+  login.hidden = true;
+  signup.hidden = false;
+});
+element("show-login").addEventListener("click", () => {
+  status.textContent = "";
+  signup.hidden = true;
+  login.hidden = false;
+});
+element("refresh-approval").addEventListener("click", async () => {
+  if (!session || !currentUserId) return;
+  status.textContent = "";
+  try {
+    await loadSessionState(session, currentUserId);
+  } catch (error) {
+    status.textContent = errorMessage(error);
+  }
+});
+
+signup.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const button = signup.querySelector("button");
+  if (!button) return;
+  button.disabled = true;
+  status.textContent = "";
+  try {
+    const form = new FormData(signup);
+    const email = String(form.get("email") || "").trim();
+    const password = String(form.get("password") || "");
+    const note = String(form.get("note") || "").trim();
+    const { data, error } = await auth.auth.signUp({
+      email,
+      password,
+      options: { data: note ? { note } : {} },
+    });
+    if (error) throw error;
+    signup.reset();
+    if (data.session && data.user) {
+      await loadSessionState(data.session.access_token, data.user.id);
+    } else {
+      signup.hidden = true;
+      login.hidden = false;
+      status.textContent = "계정 신청이 접수되었습니다. 관리자 승인 후 로그인할 수 있습니다.";
+    }
+  } catch (error) {
+    status.textContent = errorMessage(error);
+  } finally {
+    button.disabled = false;
+  }
+});
+
 login.addEventListener("submit", async (event) => {
   event.preventDefault();
   const button = login.querySelector("button");
@@ -445,13 +619,8 @@ login.addEventListener("submit", async (event) => {
       password: String(credentials.get("password") || ""),
     });
     if (error || !data.session) throw error || new Error("로그인하지 못했습니다.");
-    session = data.session.access_token;
     login.reset();
-    login.hidden = true;
-    logout.hidden = false;
-    element("library").hidden = false;
-    if (authorizationId) await showConsent();
-    else await refresh(session);
+    await loadSessionState(data.session.access_token, data.session.user.id);
   } catch (error) {
     status.textContent = errorMessage(error);
   } finally {
@@ -461,18 +630,23 @@ login.addEventListener("submit", async (event) => {
 
 function showSignedOut() {
   if (dialog.open) dialog.close();
+  if (adminDialog.open) adminDialog.close();
   trashView = false;
   element("files-heading").textContent = "저장된 파일";
   element("show-trash").textContent = "휴지통";
   filesPage.hidden = false;
   uploadPage.hidden = true;
   session = undefined;
+  currentUserId = undefined;
   records = [];
   renderFiles();
   element("uploads").replaceChildren();
   element("library").hidden = true;
   element("oauth-consent").hidden = true;
+  pendingView.hidden = true;
+  showAdmin.hidden = true;
   logout.hidden = true;
+  signup.hidden = true;
   login.hidden = false;
   status.textContent = "";
 }
@@ -499,12 +673,9 @@ auth.auth.onAuthStateChange((event, current) => {
 async function restoreSession() {
   const { data, error } = await auth.auth.getSession();
   if (error || !data.session) return;
-  session = data.session.access_token;
-  login.hidden = true;
-  logout.hidden = false;
-  element("library").hidden = false;
-  try { if (authorizationId) await showConsent(); else await refresh(session); }
-  catch (error) { status.textContent = errorMessage(error); }
+  try {
+    await loadSessionState(data.session.access_token, data.session.user.id);
+  } catch (error) { status.textContent = errorMessage(error); }
 }
 void restoreSession();
 

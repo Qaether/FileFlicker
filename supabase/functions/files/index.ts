@@ -17,16 +17,30 @@ const storage = new S3Client({
   credentials: { accessKeyId: env("R2_ACCESS_KEY_ID"), secretAccessKey: env("R2_SECRET_ACCESS_KEY") },
 });
 
-async function files(query: URLSearchParams, method = "GET", body?: object, prefer?: string) {
+async function serviceQuery(table: string, query: URLSearchParams, method = "GET", body?: object, prefer?: string) {
   const headers = new Headers({ apikey: secretKey, "content-type": "application/json" });
   if (!secretKey.startsWith("sb_secret_")) headers.set("authorization", `Bearer ${secretKey}`);
   if (prefer) headers.set("prefer", prefer);
-  const response = await fetch(`${projectUrl}/rest/v1/files?${query}`, {
+  const response = await fetch(`${projectUrl}/rest/v1/${table}?${query}`, {
     method, headers, body: body ? JSON.stringify(body) : undefined,
     signal: AbortSignal.timeout(10000),
   });
-  if (!response.ok) throw new Error("File metadata request failed");
+  if (!response.ok) throw new Error("Database metadata request failed");
   return await response.json();
+}
+const files = (query: URLSearchParams, method = "GET", body?: object, prefer?: string) =>
+  serviceQuery("files", query, method, body, prefer);
+
+async function confirmUserEmail(userId: string) {
+  const headers = new Headers({ apikey: secretKey, "content-type": "application/json" });
+  if (!secretKey.startsWith("sb_secret_")) headers.set("authorization", `Bearer ${secretKey}`);
+  const response = await fetch(`${projectUrl}/auth/v1/admin/users/${userId}`, {
+    method: "PUT",
+    headers,
+    body: JSON.stringify({ email_confirm: true }),
+    signal: AbortSignal.timeout(10000),
+  });
+  if (!response.ok) throw new Error("Failed to confirm user account");
 }
 
 Deno.serve(async (request) => {
@@ -57,6 +71,40 @@ Deno.serve(async (request) => {
     }
     if (claims.client_id && input.action !== "download") {
       return reply({ error: "OAuth 연결은 파일 읽기만 허용됩니다." }, 403);
+    }
+    const [profile] = await serviceQuery("profiles", new URLSearchParams({
+      id: `eq.${user.id}`,
+      select: "id,role,status",
+    })) as Array<{ id: string; role: string; status: string }>;
+    if (!profile || profile.status !== "approved") {
+      return reply({ error: "관리자 승인 후 이용할 수 있습니다." }, 403);
+    }
+    if (input.action === "admin_users") {
+      if (profile.role !== "admin") return reply({ error: "관리자 권한이 필요합니다." }, 403);
+      const users = await serviceQuery("profiles", new URLSearchParams({
+        select: "id,email,role,status,note,created_at,approved_at",
+        order: "created_at.desc",
+      }));
+      return reply({ users });
+    }
+    if (input.action === "admin_set_status") {
+      if (profile.role !== "admin") return reply({ error: "관리자 권한이 필요합니다." }, 403);
+      const { targetId, status } = input;
+      if (typeof targetId !== "string" || !/^[a-f0-9-]{36}$/i.test(targetId) ||
+        (status !== "approved" && status !== "rejected" && status !== "pending")) {
+        return reply({ error: "잘못된 요청입니다." }, 400);
+      }
+      if (targetId === user.id && status !== "approved") {
+        return reply({ error: "현재 관리자 계정은 변경할 수 없습니다." }, 400);
+      }
+      if (status === "approved") await confirmUserEmail(targetId);
+      const updated = await serviceQuery("profiles", new URLSearchParams({ id: `eq.${targetId}` }), "PATCH", {
+        status,
+        updated_at: new Date().toISOString(),
+        approved_at: status === "approved" ? new Date().toISOString() : null,
+      }, "return=representation");
+      if (!Array.isArray(updated) || !updated.length) return reply({ error: "사용자를 찾을 수 없습니다." }, 404);
+      return reply({ id: targetId, status });
     }
     const owned = new URLSearchParams({ owner_id: `eq.${user.id}`, deleted_at: "is.null" });
     if (input.action === "reserve") {

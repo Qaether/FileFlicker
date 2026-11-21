@@ -1,5 +1,9 @@
 # FileFlicker 완료 기록
 
+- 계정 신청(`signUp` + 선택 메모)과 관리자 승인(`admin_users`, `admin_set_status`) 기능을 구현했다. 미승인 계정은 로그인 시 승인 대기 화면만 표시되고 DB RLS와 `files` Edge Function에서 차단되며, 관리자는 상단 `관리자` 모달에서 신청자를 승인·거절·정지할 수 있다. 승인 시 Supabase Auth 이메일 확인(`email_confirm`)도 함께 처리한다. TypeScript·Tailwind·Vite 프로덕션 빌드를 통과했고 DB 트리거를 운영 DB에 반영했다. 실제 브라우저에서 신규 신청→승인→로그인 전체 흐름 검증과 운영 배포는 남아 있다.
+
+- `public.profiles` 테이블(`role`: `admin`/`user`, `status`: `pending`/`approved`/`rejected`)과 신규 가입자 자동 등록 트리거, RLS 정책을 [user_profiles.sql](supabase/schema/user_profiles.sql)에 작성하고 운영 Supabase DB에 적용했다. `khan@ynarcher.com` 계정이 `admin`·`approved` 상태로 등록되었고 `public.files` 조회 RLS에도 승인 상태 검사를 연결했다. 계정 신청 및 관리자 승인 UI/API 구현은 남아 있다.
+
 - FileFlicker 웹 앱을 PWA로 구성(`manifest.webmanifest`, `sw.js`, 앱 아이콘 192/512/SVG/Apple Touch Icon, 서비스 워커 등록, 상단 `앱 설치` 버튼 및 iOS 설치 안내)하고, 파일 삭제(휴지통 이동) 시 확인 팝업을 띄우도록 추가했다. TypeScript 타입 검사와 프로덕션 빌드를 통과했고 `dist/`에 PWA 자산이 포함됨을 확인했다. 실제 브라우저/모바일에서 PWA 설치 및 삭제 확인 팝업 통합 검증과 운영 배포는 남아 있다.
 
 - 신규 업로드 허용 확장자에 `.xlsx`를 추가하고 화면 안내 문구와 구현 계획(`implemenation.md`)을 갱신했다. TypeScript 타입 검사와 프로덕션 빌드를 통과했다. 실제 브라우저에서 `.xlsx` 업로드 통합 검증과 운영 배포는 남아 있다.
