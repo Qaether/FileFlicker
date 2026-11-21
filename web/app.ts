@@ -295,7 +295,34 @@ fileForm.addEventListener("focusout", (event) => {
   if ((event.target as HTMLElement).id === "tags") commitTags();
   if (!trashView && snapshot() !== savedSnapshot) void saveChanges();
 });
-element<HTMLInputElement>("tags").addEventListener("keydown", (event) => {
+const tagsInput = element<HTMLInputElement>("tags");
+let composingTag = false;
+let commitOnCompositionEnd = false;
+tagsInput.addEventListener("compositionstart", () => {
+  composingTag = true;
+  commitOnCompositionEnd = false;
+});
+tagsInput.addEventListener("compositionend", () => {
+  composingTag = false;
+  if (commitOnCompositionEnd) {
+    commitOnCompositionEnd = false;
+    commitTags();
+    scheduleSave();
+  }
+});
+tagsInput.addEventListener("input", (event) => {
+  if (!(event as InputEvent).isComposing && !composingTag && tagsInput.value.includes(",")) {
+    commitTags();
+    scheduleSave();
+  }
+});
+tagsInput.addEventListener("keydown", (event) => {
+  if (event.isComposing || composingTag || event.keyCode === 229) {
+    if (event.key === "Enter" || event.code === "Enter" || event.code === "NumpadEnter") {
+      commitOnCompositionEnd = true;
+    }
+    return;
+  }
   if (event.key === "Enter" || event.key === ",") {
     event.preventDefault();
     commitTags();
